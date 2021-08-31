@@ -64,6 +64,11 @@ def fastq_prework(indir, max_process):
             if file.split('_')[-2] == 'R1':
                 sample_name.append(file)
         name_state = 'giab'
+    elif _ex.find('R1') != -1 or _ex.find('R2') != -1:
+        for file in tmp_file_name:
+            if file.find('R1') != -1:
+                sample_name.append(file)
+        name_state = 'other'
     else:
         sys.exit('[ E: Can not analysis input raw data name <%s>]' % _ex)
     if max_process >= len(sample_name):
@@ -87,7 +92,7 @@ def get_raw_info(fq1, state):
     # NA24695_CTTGTA_L002_R2_014.fastq.gz
     name_in = fq1.split('/')[-1]
     info = name_in.split('_')
-    if state is 'novo':
+    if state == 'novo':
         return info[0], info[2], info[3]
     else:
         with gzip.open(fq1, 'rb') as f:
