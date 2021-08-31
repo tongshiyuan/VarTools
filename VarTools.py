@@ -117,6 +117,8 @@ def main():
         pass
     elif args['fun'] == 'cc':
         pass
+    else:
+        sys.exit('[ Err: can not identify the function of %s]' % args['fun'])
     end_time = time.perf_counter()
     print('[ Msg: Use time : <%d> s]' % (end_time - start_time))
     print(end_words)
