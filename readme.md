@@ -1,6 +1,6 @@
-# vartools
-[TOC]
-## 功能 
+# VarTools
+
+## funcion
 1. f2v: analysis from fastq to gvcf. 
 2. gt: from gvcf created by GATK to vcf. 
 3. trio: trio analysis
