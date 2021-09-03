@@ -1,9 +1,17 @@
 # VarTools
+---
+
+## requests
+ - python 3.x
+ - numpy
+ - pandas
+ - scipy
 
 ## funcion
 1. f2v: analysis from fastq to gvcf. 
-2. gt: from gvcf created by GATK to vcf. 
-3. trio: trio analysis
+2. tGT: from gvcf created by GATK to vcf in trio mode.
+3. sGT: from gvcf created by GATK to vcf in single mode.
+4. cc: case-control analysis with 2 ways.
 
 ### f2v
 ~~~(shell)

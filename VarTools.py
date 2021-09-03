@@ -51,6 +51,9 @@ def ana_args():
     # parser.add_argument('-f', '--father', help='directory of father raw data')
     # parser.add_argument('-m', '--mother', help='directory of mother raw data')
     # parser.add_argument('-s', '--sibling', help='directory of siblings raw data, more one use \',\' split')
+    # case-control
+    parser.add_argument('-i', '--', help='')
+    parser.add_argument('-o', '--', help='')
 
     args = parser.parse_args()
     # thread
