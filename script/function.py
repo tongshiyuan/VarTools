@@ -6,6 +6,7 @@ from script.mapping import align_deal
 from script.calling import gatk_pre, gatk, gatk_hard
 from script.common import check_software, affinity
 from script.annotation import trio_short_variants_filter
+from script.case_control import cc_preprocess, div_cc
 
 
 def readConfig(configFile):
@@ -113,3 +114,14 @@ def trio_analysis():
     #                            config['AFTh'],
     #                            config['anno_dir'], config['ref_version'], thread)
     # print('[ Msg: All sample gatk calling done ! ]')
+
+
+def burden_test(case, control, out_dir, snvdb, mode, cutoff, method, gene, score):
+    tmp_dir = out_dir + '/tmp'
+    os.makedirs(tmp_dir)
+    if method:
+        out_case, out_control = cc_preprocess(case, control, tmp_dir, snvdb, mode)
+        df = div_cc(out_case, out_control, cutoff=cutoff)
+    else:
+        df = div_cc(case, control, gene, score, cutoff)
+    df.to_csv(out_dir + '/result.txt', sep='\t', index=False)

@@ -8,12 +8,13 @@
 # log:
 # 21.05.31: 根据新的框架修改，为了拓展性、适配性更好
 # 21.08.31: 完善框架，修改了一些已知错误
+# 21.09.03: 修改传入参数，添加GRIPT版case-control (未根据源码而是根据论文复现，会存在与原工具的结果差异)
 ##################################################
 import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt
+from script.function import f2v, trio_gt, single_gt, burden_test
 
 
 def ana_args():
@@ -39,7 +40,7 @@ def ana_args():
     parser.add_argument('-t', '--thread', help='thread of component softwares, [6]')
     # f2v
     parser.add_argument('-i', '--indir', help='directory of single sample raw data')
-    parser.add_argument('-v', '--vcf', help='Whether to generate vcf file, True/False, [False]')
+    parser.add_argument('--vcf', action="store_true", help='Whether to generate vcf file.')
     # tGT && sGT
     parser.add_argument('-p', '--proband', help='directory of proband raw data')
     parser.add_argument('-f', '--father', help='directory of father raw data')
@@ -52,8 +53,13 @@ def ana_args():
     # parser.add_argument('-m', '--mother', help='directory of mother raw data')
     # parser.add_argument('-s', '--sibling', help='directory of siblings raw data, more one use \',\' split')
     # case-control
-    parser.add_argument('-i', '--', help='')
-    parser.add_argument('-o', '--', help='')
+    parser.add_argument('--case', help='input directory of case')
+    parser.add_argument('--control', help='input directory of control')
+    parser.add_argument('--cutoff', default=0, type=float, help='variant score cutoff. [0]')
+    parser.add_argument('--mode', default='AD', help='mode of disease, AD/AR, [AD]')
+    parser.add_argument('--snvdb', help='the false positive database that filted')
+    parser.add_argument('--gene', help='the columns name of gene in file')
+    parser.add_argument('--score', help='the columns name of metrics score in file')
 
     args = parser.parse_args()
     # thread
@@ -79,12 +85,9 @@ def ana_args():
             sys.exit('[ E: Parameter is incomplete ! ]')
         else:
             args_dict['inDir'] = args.indir
-        if args.vcf == 'True':
+        if args.vcf:
             args_dict['vcf'] = True
-        elif args.vcf == 'False' or not args.vcf:
-            args_dict['vcf'] = False
         else:
-            print('[ W: Can not identify vcf parameter, and use "False". ]')
             args_dict['vcf'] = False
     elif args_dict['fun'] == 'tGT':
         if args.proband and args.father and args.mother:
@@ -99,6 +102,28 @@ def ana_args():
             sys.exit('[ E: trio sample incomplete ! ]')
     elif args_dict['fun'] == 'sGT':
         args_dict['pgVCF'] = os.path.realpath(args.proband)
+    elif args_dict['fun'] == 'cc':
+        if not args.case or not args.contol:
+            args_dict['case'] = args.case
+            args_dict['control'] = args.control
+        else:
+            sys.exit('[ E: Parameter is incomplete ! ]')
+        args_dict['cutoff'] = args.cutoff
+        args_dict['mode'] = args.mode
+        args_dict['snvdb'] = args.snvdb
+        args_dict['gene'] = args.gene
+        args_dict['score'] = args.score
+        if args.gene and args.score:
+            print('[ M: Use the metrics that user set to calculate case-control. ]')
+            args_dict['cc_default'] = False
+        elif not args.gene and not args.score:
+            args_dict['cc_default'] = True
+            print('[ M: Use default method to calculate case-control. ]')
+        else:
+            print('[ W: Parameter is incomplete ! and use default method to calculate case-control. ]')
+            args_dict['cc_default'] = True
+    else:
+        sys.exit('[ Err: can not identify the function of <%s>]' % args_dict['fun'])
 
     return args_dict
 
@@ -119,9 +144,9 @@ def main():
     elif args['fun'] == 'sA':
         pass
     elif args['fun'] == 'cc':
-        pass
-    else:
-        sys.exit('[ Err: can not identify the function of %s]' % args['fun'])
+        burden_test(args['case'], args['control'], args['outPath'], args['snvdb'], args['mode'], args['cutoff'],
+                    args['cc_default'], args['gene'], args['score'])
+
     end_time = time.perf_counter()
     print('[ Msg: Use time : <%d> s]' % (end_time - start_time))
     print(end_words)
