@@ -30,6 +30,7 @@ def ana_args():
     (6) tA: trio analysis.
     (7) sA: single case analysis.
     (8) cc: case-control analysis with 2 ways.
+    (9) fp: create false positive database from vcf files or avinput files.
     '''
     print(description)
     parser = argparse.ArgumentParser()
@@ -55,6 +56,8 @@ def ana_args():
     # case-control
     parser.add_argument('--case', help='input directory of case')
     parser.add_argument('--control', help='input directory of control')
+    parser.add_argument('--case_matrix', help='matrix of case create by this program')
+    parser.add_argument('--control_matrix', help='matrix of control create by this program')
     parser.add_argument('--cutoff', default=0, type=float, help='variant score cutoff. [0]')
     parser.add_argument('--mode', default='AD', help='mode of disease, AD/AR, [AD]')
     parser.add_argument('--snvdb', help='the false positive database that filted')
@@ -103,9 +106,11 @@ def ana_args():
     elif args_dict['fun'] == 'sGT':
         args_dict['pgVCF'] = os.path.realpath(args.proband)
     elif args_dict['fun'] == 'cc':
-        if not args.case or not args.contol:
+        if (args.case or args.case_matrix) and (args.contol or args.control_matrix):
             args_dict['case'] = args.case
+            args_dict['case_matrix'] = args.case_matrix
             args_dict['control'] = args.control
+            args_dict['control_matrix'] = args.control_matrix
         else:
             sys.exit('[ E: Parameter is incomplete ! ]')
         args_dict['cutoff'] = args.cutoff
@@ -122,6 +127,8 @@ def ana_args():
         else:
             print('[ W: Parameter is incomplete ! and use default method to calculate case-control. ]')
             args_dict['cc_default'] = True
+    elif args_dict['fun'] == 'fp':
+        pass
     else:
         sys.exit('[ Err: can not identify the function of <%s>]' % args_dict['fun'])
 
@@ -144,8 +151,9 @@ def main():
     elif args['fun'] == 'sA':
         pass
     elif args['fun'] == 'cc':
-        burden_test(args['case'], args['control'], args['outPath'], args['snvdb'], args['mode'], args['cutoff'],
-                    args['cc_default'], args['gene'], args['score'])
+        burden_test(args['case'], args['control'], args['case_matrix'], args['control_matrix'],
+                    args['outPath'], args['snvdb'], args['mode'], args['cutoff'],
+                    args['cc_default'], args['gene'], args['score'], args['scriptPath'])
 
     end_time = time.perf_counter()
     print('[ Msg: Use time : <%d> s]' % (end_time - start_time))

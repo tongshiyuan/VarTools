@@ -6,7 +6,7 @@ from script.mapping import align_deal
 from script.calling import gatk_pre, gatk, gatk_hard
 from script.common import check_software, affinity
 from script.annotation import trio_short_variants_filter
-from script.case_control import cc_preprocess, div_cc
+from script.case_control import get_matrix, burden
 
 
 def readConfig(configFile):
@@ -31,6 +31,11 @@ def readConfig(configFile):
     confDict['AFTh'] = eval(config.get('filter', 'AFThreshold'))
     _ = config.get('filter', 'ClinList')
     confDict['ClinList'] = [i.strip() for i in _.split(',')]
+    # case-control
+    confDict['cc_AF'] = config.get('cc_filter', 'AF_list')
+    confDict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
+    confDict['cc_AF_AR'] = config.get('cc_filter', 'AF_th_AR')
+    confDict['cc_splice'] = config.get('cc_filter', 'splice_list')
     return confDict
 
 
@@ -116,12 +121,32 @@ def trio_analysis():
     # print('[ Msg: All sample gatk calling done ! ]')
 
 
-def burden_test(case, control, out_dir, snvdb, mode, cutoff, method, gene, score):
-    tmp_dir = out_dir + '/tmp'
-    os.makedirs(tmp_dir)
+def burden_test(case, control, case_matrix, control_matrix,
+                out_dir, snvdb, mode, cutoff, method, gene, score, scriptPath):
+    config = readConfig(scriptPath + '/lib/config.ini')
+    out_case = out_dir + '/case_out'
+    os.makedirs(out_case)
+    out_control = out_dir + '/control_out'
+    os.makedirs(out_control)
     if method:
-        out_case, out_control = cc_preprocess(case, control, tmp_dir, snvdb, mode)
-        df = div_cc(out_case, out_control, cutoff=cutoff)
+        # case
+        if case and not case_matrix:
+            case_matrix = get_matrix(case, 'CASE_', config, out_case, mode, snvdb=snvdb)
+            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
+        # control
+        if control and not control_matrix:
+            control_matrix = get_matrix(control, 'CONTROL_', config, out_control, mode, snvdb=snvdb)
+            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
     else:
-        df = div_cc(case, control, gene, score, cutoff)
-    df.to_csv(out_dir + '/result.txt', sep='\t', index=False)
+        # case
+        if case and not case_matrix:
+            case_matrix = get_matrix(case, 'CASE_', config, mode=mode, gene_col_name=gene, score_col_name=score,
+                                     snvdb=snvdb, pattern=False)
+            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
+        # control
+        if control and not control_matrix:
+            control_matrix = get_matrix(control, 'CONTROL_', config, mode=mode, gene_col_name=gene,
+                                        score_col_name=score, snvdb=snvdb, pattern=False)
+            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
+    rank_df = burden(case_matrix, control_matrix, cutoff=cutoff)
+    rank_df.to_csv(out_dir + '/gene_rank.txt', index=False, sep='\t')
