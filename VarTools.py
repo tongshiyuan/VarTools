@@ -15,6 +15,7 @@ import sys
 import time
 import argparse
 from script.function import f2v, trio_gt, single_gt, burden_test
+from script.case_control import build_snvdb
 
 
 def ana_args():
@@ -63,7 +64,10 @@ def ana_args():
     parser.add_argument('--snvdb', help='the false positive database that filted')
     parser.add_argument('--gene', help='the columns name of gene in file')
     parser.add_argument('--score', help='the columns name of metrics score in file')
-
+    # build false positive data base
+    parser.add_argument('--file_type', default='vcf', help='file type of input files, vcf/avinput. [vcf]')
+    parser.add_argument('--overlap_rate', default=0.5, type=float,
+                        help='overlap rate of variants to build false positive database, [0.5]')
     args = parser.parse_args()
     # thread
     if not args.thread:
@@ -128,7 +132,8 @@ def ana_args():
             print('[ W: Parameter is incomplete ! and use default method to calculate case-control. ]')
             args_dict['cc_default'] = True
     elif args_dict['fun'] == 'fp':
-        pass
+        args_dict['file_type'] = args.file_type
+        args_dict['overlap_rate'] = args.overlap_rate
     else:
         sys.exit('[ Err: can not identify the function of <%s>]' % args_dict['fun'])
 
@@ -154,7 +159,10 @@ def main():
         burden_test(args['case'], args['control'], args['case_matrix'], args['control_matrix'],
                     args['outPath'], args['snvdb'], args['mode'], args['cutoff'],
                     args['cc_default'], args['gene'], args['score'], args['scriptPath'])
-
+    elif args['fun'] == 'fp':
+        build_snvdb(args['inDir'], args['outPath'], args['snvdb'],
+                    args['scriptPath'], args['file_type'], args['overlap_rate'],
+                    )
     end_time = time.perf_counter()
     print('[ Msg: Use time : <%d> s]' % (end_time - start_time))
     print(end_words)

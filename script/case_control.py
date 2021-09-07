@@ -43,10 +43,12 @@ def burden(case_matrix, control_matrix, gene_col_name='Gene', cutoff=0):
     for tup in df_matrix.itertuples():
         gene_list.append(tup[1])
         s1 = list(tup[2:N1 + 2])
+        s1 = [eval(x) for x in ','.join([str(_) for _ in s1]).split(',')]
         s1 = [s1[i] for i in range(0, len(s1)) if s1[i] > cutoff]
         if not s1:
             s1 = [0]
         s2 = list(tup[N1 + 2:])
+        s2 = [eval(x) for x in ','.join([str(_) for _ in s2]).split(',')]
         s2 = [s2[i] for i in range(0, len(s2)) if s2[i] > cutoff]
         if not s2:
             s2 = [0]
@@ -82,8 +84,8 @@ def uniq_gene_df(df_gene_col, df_score_col, mode):
             elif len(_score) > 2:
                 genes.append(k)
                 _score.sort()
-                m1 = scores[-1]
-                m2 = scores[-2]
+                m1 = _score[-1]
+                m2 = _score[-2]
                 scores.append(','.join([m1, m2]))
     return genes, scores
 

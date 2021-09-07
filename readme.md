@@ -33,6 +33,11 @@ python3 VarTools sGT -p .gvcf -o ./result/outName
 python3 VarTools cc --case case_dir --control control_dir --mode AD -o result
 ~~~
 
+### build false positive databse
+~~~(shell)
+python3 VarTools fp -i indir -o ./result --snvdb false_positive.txt --overlap_rate 0.3 --file_type vcf
+~~~
+
 ### software
 - [GATK](https://github.com/broadinstitute/gatk/releases/download/4.2.0.0/gatk-4.2.0.0.zip)
 - [fastp](http://opengene.org/fastp/fastp)
