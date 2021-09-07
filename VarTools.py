@@ -33,7 +33,6 @@ def ana_args():
     (8) fp: create false positive database from vcf files or avinput files.
     (9) cc: case-control analysis with GRIPT.
     (10) bt: Burden testing with TRAPD.
-    
     '''
     print(description)
     parser = argparse.ArgumentParser()
