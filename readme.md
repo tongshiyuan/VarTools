@@ -1,5 +1,4 @@
 # VarTools
----
 
 ## requests
  - python 3.x
@@ -12,6 +11,7 @@
 2. tGT: from gvcf created by GATK to vcf in trio mode.
 3. sGT: from gvcf created by GATK to vcf in single mode.
 4. cc: case-control analysis with 2 ways.
+5. fp: build false positive database for filter
 
 ### f2v
 ~~~(shell)
