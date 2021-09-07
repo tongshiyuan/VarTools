@@ -106,7 +106,7 @@ def ana_args():
     elif args_dict['fun'] == 'sGT':
         args_dict['pgVCF'] = os.path.realpath(args.proband)
     elif args_dict['fun'] == 'cc':
-        if (args.case or args.case_matrix) and (args.contol or args.control_matrix):
+        if (args.case or args.case_matrix) and (args.control or args.control_matrix):
             args_dict['case'] = args.case
             args_dict['case_matrix'] = args.case_matrix
             args_dict['control'] = args.control

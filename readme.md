@@ -28,6 +28,11 @@ python3 VarTools tGT -p .gvcf -f .gvcf -m .gvcf -s .gvcf,.gvcf -o ./result/outNa
 python3 VarTools sGT -p .gvcf -o ./result/outName
 ~~~
 
+### case-control
+~~~(shell)
+python3 VarTools cc --case case_dir --control control_dir --mode AD -o result
+~~~
+
 ### software
 - [GATK](https://github.com/broadinstitute/gatk/releases/download/4.2.0.0/gatk-4.2.0.0.zip)
 - [fastp](http://opengene.org/fastp/fastp)

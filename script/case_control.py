@@ -92,26 +92,30 @@ def get_matrix(file_dir, tag, config, out_dir='', mode='AD',
                gene_col_name='Gene', score_col_name='Score', snvdb='', pattern=True):
     if pattern:
         for num, file in enumerate(os.listdir(file_dir)):
-            filter_score(file_dir + '/' + file, out_dir, config, mode, snvdb)
+            if not file.startswith('.'):
+                filter_score(file_dir + '/' + file, out_dir, config, mode, snvdb)
+            else:
+                continue
+            df = pd.read_table(out_dir + '/' + file.split('/')[-1] + '.score', low_memory=False)
+            genes, scores = uniq_gene_df(df[gene_col_name], df[score_col_name], mode)
             if num == 0:
-                df_matrix = pd.read_table(out_dir + '/' + file.split('/')[-1] + '.score', low_memory=False)
-                genes, scores = uniq_gene_df(df_matrix[gene_col_name], df_matrix[score_col_name], mode)
                 df_matrix = pd.DataFrame(columns=[gene_col_name, tag + str(num + 1)])
                 df_matrix[gene_col_name] = genes
                 df_matrix[tag + str(num + 1)] = scores
-            if not file.startswith('.'):
-                _df = pd.read_table(out_dir + '/' + file.split('/')[-1] + '.score', low_memory=False)
-                genes, scores = uniq_gene_df(_df[gene_col_name], _df[score_col_name], mode)
+            elif not file.startswith('.'):
                 _df = pd.DataFrame(columns=[gene_col_name, tag + str(num + 1)])
                 _df[gene_col_name] = genes
                 _df[tag + str(num + 1)] = scores
                 df_matrix = pd.merge(df_matrix, _df, how='outer', on=[gene_col_name])
     else:
         for num, file in enumerate(os.listdir(file_dir)):
-            if snvdb:
-                df = rm_snvdb(file_dir + '/' + file, snvdb)
+            if not file.startswith('.'):
+                if snvdb:
+                    df = rm_snvdb(file_dir + '/' + file, snvdb)
+                else:
+                    df = pd.read_table(file_dir + '/' + file, low_memory=False)
             else:
-                df = pd.read_table(file_dir + '/' + file, low_memory=False)
+                continue
             genes, scores = uniq_gene_df(df[gene_col_name], df[score_col_name], mode)
             if num == 0:
                 df_matrix = pd.DataFrame(columns=[gene_col_name, tag + str(num + 1)])
@@ -142,7 +146,7 @@ def filter_score(file, outdir, config, mode, ctlf=''):
         'UTR_InterGenic': 0
     }
     # 读取文件
-    df = pd.read_table(file, low_memory=False)
+    df = pd.read_table(file)
     # AF过滤
     df.replace('.', 0, inplace=True)
     AF_list = [_.strip() for _ in config['cc_AF'].split(',')]
