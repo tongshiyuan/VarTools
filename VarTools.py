@@ -30,8 +30,10 @@ def ana_args():
     (5) sSV: call single SV with clinSV (only for WGS).
     (6) tA: trio analysis.
     (7) sA: single case analysis.
-    (8) cc: case-control analysis with 2 ways.
-    (9) fp: create false positive database from vcf files or avinput files.
+    (8) fp: create false positive database from vcf files or avinput files.
+    (9) cc: case-control analysis with GRIPT.
+    (10) bt: Burden testing with TRAPD.
+    
     '''
     print(description)
     parser = argparse.ArgumentParser()
