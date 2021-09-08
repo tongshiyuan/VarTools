@@ -118,6 +118,7 @@ def get_matrix(file_dir, tag, config, out_dir='', mode='AD',
                     df = pd.read_table(file_dir + '/' + file, low_memory=False)
             else:
                 continue
+            df.fillna(0, inplace=True)
             genes, scores = uniq_gene_df(df[gene_col_name], df[score_col_name], mode)
             if num == 0:
                 df_matrix = pd.DataFrame(columns=[gene_col_name, tag + str(num + 1)])
