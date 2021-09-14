@@ -231,7 +231,7 @@ def filter_score(file, outdir, config, mode, ctlf=''):
                     break
             else:
                 score = score_conf['unknown']  # unknown = 20
-        elif tup[_efc_index] not in ['.', '0', 0] and tup[_efc_index].find('splicing') != -1:
+        elif tup[_fc_index] not in ['.', '0', 0] and tup[_fc_index].find('splicing') != -1:
             score = score_conf['splice']
         else:
             for index in _splice_index:
