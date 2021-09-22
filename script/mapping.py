@@ -54,7 +54,7 @@ def align_deal(indir,
     execute_system(dup_cmd, '[ Msg: <%s> mark duplication done ! ]' % sample_name,
                    '[ E: Something wrong with <%s> mark duplication ! ]' % sample_name)
 
-    rm_cmd = 'rm -f %s' % tmp_dir
+    rm_cmd = 'rm -rf %s' % tmp_dir
     execute_system(rm_cmd, '[Msg: Delete <%s> process file done and begin to index ... ]' % sample_name,
                    '[ E: Something wrong with delete <%s> process file after mark duplicate ! ]' % sample_name)
     # index
