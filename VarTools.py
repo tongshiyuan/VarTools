@@ -94,10 +94,7 @@ def ana_args():
             sys.exit('[ E: Parameter is incomplete ! ]')
         else:
             args_dict['inDir'] = args.indir
-        if args.vcf:
-            args_dict['vcf'] = True
-        else:
-            args_dict['vcf'] = False
+        args_dict['vcf'] = args.vcf
     elif args_dict['fun'] == 'tGT':
         if args.proband and args.father and args.mother:
             args_dict['pgVCF'] = os.path.realpath(args.proband)
