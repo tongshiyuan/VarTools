@@ -2,7 +2,7 @@ import os
 import sys
 import configparser
 from script.qc import fastp_qc
-from script.mapping import align_deal
+from script.mapping import align_deal, bam_stats
 from script.calling import gatk_pre, gatk, gatk_hard
 from script.common import check_software, affinity
 from script.annotation import trio_short_variants_filter
@@ -39,7 +39,7 @@ def readConfig(configFile):
     return confDict
 
 
-def f2v(inDir, outDir, thread, scriptPath, vcf):
+def f2v(inDir, outDir, thread, scriptPath, vcf, bq, bed):
     rst = check_software('samtools')
     if rst:
         sys.exit()
@@ -66,7 +66,7 @@ def f2v(inDir, outDir, thread, scriptPath, vcf):
     bam_tmp_dir = outDir + '/' + sampleName + '/tmp'
     # os.makedirs(bam_tmp_dir)
     bamfile = align_deal(fqOutDir, bamOutdir, sampleName, config['reference'], bam_report_dir, bam_tmp_dir,
-                         config['mapping'], config['alnProcess'], thread, scriptPath)
+                         config['mapping'], config['alnProcess'], thread, scriptPath, bq, config['ref_version'], bed)
     print('[ Msg: All sample mapping done ! ]')
     print('[ Msg: Waiting for gatk calling done ... ]')
     # short variants calling
@@ -150,3 +150,9 @@ def burden_test(case, control, case_matrix, control_matrix,
             control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
     rank_df = burden(case_matrix, control_matrix, cutoff=cutoff)
     rank_df.to_csv(out_dir + '/gene_rank.txt', index=False, sep='\t')
+
+
+def bamQC(bam, bed, out_dir, script_path, thread, bq):
+    tmp_dir = out_dir + '/tmp_dir'
+    os.makedirs(tmp_dir)
+    bam_stats(bam, out_dir, thread, tmp_dir, script_path, bq, '', bed)

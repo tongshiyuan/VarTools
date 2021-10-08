@@ -1,4 +1,5 @@
 import os
+import pandas as pd
 from multiprocessing import Pool
 from script.common import execute_system, fastq_prework, get_raw_info, check_software
 
@@ -14,7 +15,10 @@ def align_deal(indir,
                software,
                max_process,
                thread,
-               script_path):
+               script_path,
+               bq,
+               ver,
+               bed):
     # mapping and sort
     indir, max_process, sample_list, state = fastq_prework(indir, max_process)
     # gatk_bundle_dir = gatk_bundle_dir.rstrip('/') + '/'
@@ -48,19 +52,20 @@ def align_deal(indir,
                    '[ E: Something wrong with delete <%s> process file after merge ! ]' % sample_name)
     # mark duplicate
     _duped_bam = outdir + '/' + sample_name + '.sorted.merge.markdup.bam'
-    _dup_metrics = outdir + '/' + sample_name + '.markdup_metrics.txt'
-    dup_cmd = script_path + '/bin/gatk/gatk MarkDuplicates ' \
-                            '-INPUT %s -OUTPUT %s -METRICS_FILE %s' % (_merged_bam, _duped_bam, _dup_metrics)
+    # _dup_metrics = outdir + '/' + sample_name + '.markdup_metrics.txt'
+    # dup_cmd = script_path + '/bin/gatk/gatk MarkDuplicates ' \
+    #                         '-INPUT %s -OUTPUT %s -METRICS_FILE %s' % (_merged_bam, _duped_bam, _dup_metrics)
+    dup_cmd = script_path + '/bin/sambamba markdup -r -t %d %s %s' % (thread, _merged_bam, _duped_bam)
     execute_system(dup_cmd, '[ Msg: <%s> mark duplication done ! ]' % sample_name,
                    '[ E: Something wrong with <%s> mark duplication ! ]' % sample_name)
 
     rm_cmd = 'rm -rf %s' % tmp_dir
     execute_system(rm_cmd, '[Msg: Delete <%s> process file done and begin to index ... ]' % sample_name,
                    '[ E: Something wrong with delete <%s> process file after mark duplicate ! ]' % sample_name)
-    # index
-    index_cmd = 'samtools index %s' % _duped_bam
-    execute_system(index_cmd, '[ Msg: <%s> bam index done ! ]' % sample_name,
-                   '[ E: Something wrong with index <%s> marked dup bam file ! ]' % sample_name)
+    # index 使用sambamba会自动产生索引文件
+    # index_cmd = 'samtools index %s' % _duped_bam
+    # execute_system(index_cmd, '[ Msg: <%s> bam index done ! ]' % sample_name,
+    #                '[ E: Something wrong with index <%s> marked dup bam file ! ]' % sample_name)
     # # BQSR
     # _bqsr_table = outdir + sample_name + '.recal_data.table'
     # _bqsr_bam = outdir + sample_name + '.BQSR.bam'
@@ -88,7 +93,7 @@ def align_deal(indir,
     #                '[ E: Something wrong with delete <%s> process file after BQSR ! ]' % sample_name)
 
     # stat result
-    bam_stats(_duped_bam, report_dir, thread, sample_name)
+    bam_stats(_duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed)
     return _duped_bam
 
 
@@ -195,15 +200,186 @@ def graph_genome(fq1, fq2, _out_bam, reference, sample_name, thread, _id, _lb):
                    '[ E: Fail delete <%s> process file after mapping and sort ! ]' % file_name)
 
 
-def bam_stats(_duped_bam, report_dir, thread, sampleName):
-    rst = check_software('qualimap')
-    if rst:
-        print('[W: Can not find qualimap. Skipping the bam quality check! ]')
-    else:
-        bamqcCmd = 'qualimap bamqc --java-mem-size=20G -bam %s -c -nt %d -outdir %s -outformat PDF:HTML' % (
-            _duped_bam, thread, report_dir)
-        rst = os.system(bamqcCmd)
+def bam_stats(_duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed):
+    if bq:
+        rst = check_software('qualimap')
         if rst:
-            print('[ E: <%s> fail to bam QC ! ]' % sampleName)
+            print('[W: Can not find qualimap. Skipping the bam quality check with qualimap ! ]')
         else:
-            print('[ Msg: <%s> bam QC done ! ]' % sampleName)
+            bamqc_cmd = 'qualimap bamqc --java-mem-size=20G -bam %s -c -nt %d -outdir %s -outformat PDF:HTML' % (
+                _duped_bam, thread, report_dir)
+            rst = os.system(bamqc_cmd)
+            if rst:
+                print('[ E: fail to bam QC with qualimap! ]')
+            else:
+                print('[ Msg: qualimap bam QC done ! ]')
+    if not bed and ver == 'hg38':
+        bedfile = script_path + '/lib/Hg38.genome.bed'
+    elif not bed and ver == 'hg19':
+        bedfile = script_path + '/lib/Hg19.genome.bed'
+    else:
+        bedfile = bed
+    bam_qc(_duped_bam, report_dir, thread, tmp_dir, script_path, bedfile)
+
+
+def bam_qc(bam, report_dir, tmp_dir, script_path, thread, bedfile):
+    base_cov, _start, end = 0, 0, 0
+    _chr = ['chr1', '1']
+    bamqc_dict = {}
+    # 目标区大小
+    new_target_file = open(tmp_dir + '/tmp_target.txt', 'w')
+    with open(bedfile) as f:
+        for line in f:
+            record = line.split('\t')
+            if eval(record[1]) > eval(record[2]):
+                print('Error: The positions are not in chromosomal order (%s:%s comes after %s)' % (
+                    record[0], record[2], record[1]))
+                new_target_file.close()
+                return 0
+            new_target_file.write('\t'.join([record[0], str(eval(record[1]) + 1), record[2]]) + '\n')
+            if record[0] in _chr and eval(record[1]) <= end:
+                if _start >= eval(record[1]):
+                    print('Error: The positions are not in chromosomal order (%s:%s comes after %s)'
+                          % (record[0], _start, record[1]))
+                    new_target_file.close()
+                    return 0
+                base_cov = base_cov - (end - eval(record[1]))
+            base_cov += eval(record[2]) - eval(record[1])
+            end = eval(record[2])
+            _start = eval(record[1])
+            _chr = record[0]
+    new_target_file.close()
+    bamqc_dict['base_cov'] = base_cov
+    # 比对率、平均测序深度
+    single_bam_qc(bam, bedfile, tmp_dir, report_dir, 'tmp_target.txt', script_path, thread)
+    os.system('rm -rf %s' % tmp_dir)
+    print('[ Msg: Bam QC done！]')
+
+
+def single_bam_qc(bam, bedfile, tmp_dir, report_dir, new_target_file, script_path, thread):
+    result_dict = {
+        'target_dep_num': 0,
+        'total_dep_num': 0,
+        'dep_1x': 0,
+        'dep_10x': 0,
+        'dep_20x': 0,
+        'dep_30x': 0,
+        'mapping_rate': 0
+    }
+    # flagstat
+    flag_cmd = 'samtools flagstat -@ %d %s > %s' % (thread, bam, report_dir + '/flagstat.txt')
+    rst = os.system(flag_cmd)
+    if rst:
+        print('[ Error: Something wrong with bam flagstat ! ]')
+    else:
+        print('[ Msg: bam flagstat done ! ]')
+        with open(report_dir + '/flagstat.txt') as f:
+            for line in f:
+                if line.find('mapped (') != -1:
+                    mapping_rate = line.split('(')[-1].split(':')[0].strip()
+                    result_dict['mapping_rate'] = mapping_rate
+                    break
+    # stats
+    stats_cmd = 'samtools stats -d -@ %d -t %s %s > %s' % (thread, new_target_file, bam, report_dir + '/stats.txt')
+    rst = os.system(stats_cmd)
+    if rst:
+        print('[ Error: Something wrong with bam stats ! ]')
+    else:
+        print('[ Msg: bam stats done ! ]')
+        with open(report_dir + '/stats.txt') as f:
+            for i in f:
+                if i.startswith('SN') and i.find('bases mapped:') != -1:
+                    result_dict['target_dep'] = eval(i.split(':')[-1].split('#')[0].strip())
+    # coverage
+    depth_cmd = script_path + '/bin/mosdepth -n -t %d -b %s -T 1,10,20,30 %s %s' % (
+        thread, bedfile, tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam'), bam)
+    rst = os.system(depth_cmd)
+    if rst:
+        print('[ Error: Something wrong with bam stat depth ! ]')
+    else:
+        print('[ Msg: bam stat depth done ! ]')
+        data = pd.read_table(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz',
+                             low_memory=False,
+                             compression='gzip')
+        sum_end_start = sum(data['end'] - data['start'])
+        sum_1X = sum(data['1X'])
+        sum_10X = sum(data['10X'])
+        sum_20X = sum(data['20X'])
+        sum_30X = sum(data['30X'])
+        p1 = sum_1X / sum_end_start
+        p10 = sum_10X / sum_end_start
+        p20 = sum_20X / sum_end_start
+        p30 = sum_30X / sum_end_start
+        result_dict['dep_1x'] = p1
+        result_dict['dep_10x'] = p10
+        result_dict['dep_20x'] = p20
+        result_dict['dep_30x'] = p30
+
+    bed_cov_list = []
+    # 区域总base
+    bedcov_cmd = 'samtools bedcov %s %s > %s' % (bedfile, bam, report_dir + '/bedcov.txt')
+    rst = os.system(bedcov_cmd)
+    if rst:
+        print('[ Error: Something wrong with bam bedcov! ]')
+    else:
+        print('[ Msg: bam bedcov done ! ]')
+        with open(report_dir + '/bedcov.txt') as f:
+            for i in f:
+                bed_cov_list.append(eval(i.split('\t')[-1]))
+            result_dict['target_dep_num'] = sum(bed_cov_list)
+    # total_dep_num
+    stats_all_cmd = 'samtools stats -d -@ %d %s > %s' % (thread, bam, tmp_dir + '/stats_arst.tmp')
+    rst = os.system(stats_all_cmd)
+    if rst:
+        print('[ Error: Something wrong with bam stats all ! ]')
+    else:
+        print('[ Msg: bam stats all done ! ]')
+        with open(tmp_dir + 'stats_arst.tmp') as f:
+            for i in f:
+                if i.startswith('SN') and i.find('bases mapped:') > 0:
+                    result_dict['total_dep_num'] = eval(i.split(':')[-1].split('#')[0].strip())
+    fo = open(report_dir + '/Bam_QC.txt', 'w')
+    for k, v in result_dict.items():
+        fo.write(k + '\t' + str(v) + '\n')
+    fo.close()
+
+
+def ref_n_counts(reference, script_path):
+    # 计算基因组每条染色体N的个数, 输出是统计覆盖率要用的，存在于当前目录下的lib目录中
+    N_count = {}
+    _chr = ''
+    with open(reference) as f:
+        for line in f:
+            if line.startswith('>'):
+                _chr = line.lstrip('>').rstrip().split('\t')[0].split(' ')[0]
+            else:
+                N_count[_chr] = line.count('N') + N_count.get(_chr, 0)
+    n_file = open(script_path + '/lib/' + reference + '.N.txt', 'w')
+    for k, v in N_count.items():
+        n_file.write(k + '\t' + str(v) + '\n')
+    n_file.close()
+    print('[ Msg: N number file created done !]')
+
+
+def n_region(fasta):
+    from Bio import SeqIO
+    bed_list = []
+    # import the SeqIO module from Biopython
+    with open(fasta) as fasta_handle:
+        for record in SeqIO.parse(fasta_handle, "fasta"):
+            start_pos, counter, gap, gap_length = 0, 0, False, 0
+            for char in record.seq:
+                if char in ['N', 'n']:
+                    if gap_length == 0:
+                        start_pos = counter
+                        gap_length = 1
+                        gap = True
+                    else:
+                        gap_length += 1
+                else:
+                    if gap:
+                        bed_list.append(record.id + "\t" + str(start_pos) + "\t" + str(start_pos + gap_length))
+                        gap_length = 0
+                        gap = False
+                counter += 1
+    return bed_list

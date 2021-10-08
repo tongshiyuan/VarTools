@@ -10,12 +10,13 @@
 # 21.08.31: 完善框架，修改了一些已知错误
 # 21.09.03: 修改传入参数，添加GRIPT版case-control (未根据源码而是根据论文复现，会存在与原工具的结果差异)
 # 21.09.08: GRIPT方法的case-control测试完毕，开始复现TRAPD版的burden
+# 21.10.08: 重构 bam qc
 ##################################################
 import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt, burden_test
+from script.function import f2v, trio_gt, single_gt, burden_test, bamQC
 from script.case_control import build_snvdb
 
 
@@ -34,6 +35,7 @@ def ana_args():
     (8) fp: create false positive database from vcf files or avinput files.
     (9) cc: case-control analysis with GRIPT.
     (10) bt: Burden testing with TRAPD.
+    (11) bqc: bam quality check.
     '''
     print(description)
     parser = argparse.ArgumentParser()
@@ -42,9 +44,14 @@ def ana_args():
     # common
     parser.add_argument('-o', '--output', help='output directory of result, [./]')
     parser.add_argument('-t', '--thread', help='thread of component softwares, [6]')
+    parser.add_argument('-b', '--bed', help='for WES/Panel region, include f2v,')
     # f2v
     parser.add_argument('-i', '--indir', help='directory of single sample raw data')
     parser.add_argument('--vcf', action="store_true", help='Whether to generate vcf file.')
+    parser.add_argument('--qualimap', action="store_true",
+                        help='bamQC with qualimap. but maybe it is slowly with large bam.')
+    # bam qc
+    parser.add_argument('--bam', help='bam file for qc. (after sort and index)')
     # tGT && sGT
     parser.add_argument('-p', '--proband', help='directory of proband raw data')
     parser.add_argument('-f', '--father', help='directory of father raw data')
@@ -87,6 +94,13 @@ def ana_args():
         args_dict['outPath'] = './'
     else:
         args_dict['outPath'] = args.output
+    # bed
+    if not args.bed:
+        args_dict['bed'] = False
+    else:
+        args_dict['bed'] = args.bed
+    #
+    args_dict['qualimap'] = args.qualimap
     # 输入 & fun
     args_dict['fun'] = args.function
     if args_dict['fun'] == 'f2v':
@@ -133,6 +147,8 @@ def ana_args():
     elif args_dict['fun'] == 'fp':
         args_dict['file_type'] = args.file_type
         args_dict['overlap_rate'] = args.overlap_rate
+    elif args_dict['fun'] == 'bqc':
+        args_dict['bam'] = args.bam
     else:
         sys.exit('[ Err: can not identify the function of <%s>]' % args_dict['fun'])
 
@@ -145,7 +161,8 @@ def main():
     # 设置参数
     args = ana_args()
     if args['fun'] == 'f2v':
-        f2v(args['inDir'], args['outPath'], args['thread'], args['scriptPath'], args['vcf'])
+        f2v(args['inDir'], args['outPath'], args['thread'], args['scriptPath'], args['vcf'], args['qualimap'],
+            args['bed'])
     elif args['fun'] == 'tGT':
         trio_gt(args['pgVCF'], args['fgVCF'], args['mgVCF'], args['sgVCF'], args['outPath'], args['scriptPath'])
     elif args['fun'] == 'sGT':
@@ -162,6 +179,8 @@ def main():
         build_snvdb(args['inDir'], args['outPath'], args['snvdb'],
                     args['scriptPath'], args['file_type'], args['overlap_rate'],
                     )
+    elif args['fun'] == 'bqc':
+        bamQC(args['bam'], args['bed'], args['outPath'], args['scriptPath'], args['thread'], args['qualimap'])
     end_time = time.perf_counter()
     print('[ Msg: Use time : <%d> s]' % (end_time - start_time))
     print(end_words)
