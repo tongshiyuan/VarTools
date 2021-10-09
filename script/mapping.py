@@ -259,7 +259,6 @@ def bam_qc(bam, report_dir, tmp_dir, script_path, thread, bedfile):
 def single_bam_qc(bam, bedfile, tmp_dir, report_dir, new_target_file, script_path, thread):
     result_dict = {
         'target_dep_num': 0,
-        'total_dep_num': 0,
         'dep_1x': 0,
         'dep_10x': 0,
         'dep_20x': 0,
@@ -315,29 +314,34 @@ def single_bam_qc(bam, bedfile, tmp_dir, report_dir, new_target_file, script_pat
         result_dict['dep_20x'] = p20
         result_dict['dep_30x'] = p30
 
-    bed_cov_list = []
-    # 区域总base
-    bedcov_cmd = 'samtools bedcov %s %s > %s' % (bedfile, bam, report_dir + '/bedcov.txt')
-    rst = os.system(bedcov_cmd)
-    if rst:
-        print('[ Error: Something wrong with bam bedcov! ]')
-    else:
-        print('[ Msg: bam bedcov done ! ]')
-        with open(report_dir + '/bedcov.txt') as f:
-            for i in f:
-                bed_cov_list.append(eval(i.split('\t')[-1]))
-            result_dict['target_dep_num'] = sum(bed_cov_list)
-    # total_dep_num
-    stats_all_cmd = 'samtools stats -d -@ %d %s > %s' % (thread, bam, tmp_dir + '/stats_arst.tmp')
-    rst = os.system(stats_all_cmd)
-    if rst:
-        print('[ Error: Something wrong with bam stats all ! ]')
-    else:
-        print('[ Msg: bam stats all done ! ]')
-        with open(tmp_dir + 'stats_arst.tmp') as f:
-            for i in f:
-                if i.startswith('SN') and i.find('bases mapped:') > 0:
-                    result_dict['total_dep_num'] = eval(i.split(':')[-1].split('#')[0].strip())
+        df = pd.read_table(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.mosdepth.summary.txt')
+        df = df[df['chrom'].isin(
+            ['chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13',
+             'chr14', 'chr15', 'chr16', 'chr17', 'chr88', 'chr19', 'chr20', 'chr21', 'chr22', 'chrX', 'chrY'])]
+        result_dict['target_dep_num'] = sum(df['bases'])
+    # 区域总base 太费时了
+    # bed_cov_list = []
+    # bedcov_cmd = 'samtools bedcov %s %s > %s' % (bedfile, bam, report_dir + '/bedcov.txt')
+    # rst = os.system(bedcov_cmd)
+    # if rst:
+    #     print('[ Error: Something wrong with bam bedcov! ]')
+    # else:
+    #     print('[ Msg: bam bedcov done ! ]')
+    #     with open(report_dir + '/bedcov.txt') as f:
+    #         for i in f:
+    #             bed_cov_list.append(eval(i.split('\t')[-1]))
+    #         result_dict['target_dep_num'] = sum(bed_cov_list)
+    # total_dep_num 太耗时
+    # stats_all_cmd = 'samtools stats -d -@ %d %s > %s' % (thread, bam, tmp_dir + '/stats_arst.tmp')
+    # rst = os.system(stats_all_cmd)
+    # if rst:
+    #     print('[ Error: Something wrong with bam stats all ! ]')
+    # else:
+    #     print('[ Msg: bam stats all done ! ]')
+    #     with open(tmp_dir + 'stats_arst.tmp') as f:
+    #         for i in f:
+    #             if i.startswith('SN') and i.find('bases mapped:') > 0:
+    #                 result_dict['total_dep_num'] = eval(i.split(':')[-1].split('#')[0].strip())
     fo = open(report_dir + '/Bam_QC.txt', 'w')
     for k, v in result_dict.items():
         fo.write(k + '\t' + str(v) + '\n')

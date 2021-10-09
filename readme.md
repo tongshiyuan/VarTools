@@ -5,7 +5,6 @@
  - numpy
  - pandas
  - scipy
- - biopython
 
 ## funcion
 1. f2v: analysis from fastq to gvcf. 
