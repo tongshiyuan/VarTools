@@ -18,7 +18,8 @@ def align_deal(indir,
                script_path,
                bq,
                ver,
-               bed):
+               bed,
+               fmd):
     # mapping and sort
     indir, max_process, sample_list, state = fastq_prework(indir, max_process)
     # gatk_bundle_dir = gatk_bundle_dir.rstrip('/') + '/'
@@ -52,20 +53,25 @@ def align_deal(indir,
                    '[ E: Something wrong with delete <%s> process file after merge ! ]' % sample_name)
     # mark duplicate
     _duped_bam = outdir + '/' + sample_name + '.sorted.merge.markdup.bam'
-    # _dup_metrics = outdir + '/' + sample_name + '.markdup_metrics.txt'
-    # dup_cmd = script_path + '/bin/gatk/gatk MarkDuplicates ' \
-    #                         '-INPUT %s -OUTPUT %s -METRICS_FILE %s' % (_merged_bam, _duped_bam, _dup_metrics)
-    dup_cmd = script_path + '/bin/sambamba markdup -r -t %d %s %s' % (thread, _merged_bam, _duped_bam)
-    execute_system(dup_cmd, '[ Msg: <%s> mark duplication done ! ]' % sample_name,
-                   '[ E: Something wrong with <%s> mark duplication ! ]' % sample_name)
+    if fmd:
+        dup_cmd = script_path + '/bin/sambamba markdup -t %d %s %s' % (thread, _merged_bam, _duped_bam)
+        execute_system(dup_cmd, '[ Msg: <%s> mark duplication done ! ]' % sample_name,
+                       '[ E: Something wrong with <%s> mark duplication ! ]' % sample_name)
+    else:
+        _dup_metrics = outdir + '/' + sample_name + '.markdup_metrics.txt'
+        dup_cmd = script_path + '/bin/gatk/gatk MarkDuplicates ' \
+                                '-INPUT %s -OUTPUT %s -METRICS_FILE %s' % (_merged_bam, _duped_bam, _dup_metrics)
+        execute_system(dup_cmd, '[ Msg: <%s> mark duplication done ! ]' % sample_name,
+                       '[ E: Something wrong with <%s> mark duplication ! ]' % sample_name)
+        # index 使用sambamba会自动产生索引文件
+        index_cmd = 'samtools index %s' % _duped_bam
+        execute_system(index_cmd, '[ Msg: <%s> bam index done ! ]' % sample_name,
+                       '[ E: Something wrong with index <%s> marked dup bam file ! ]' % sample_name)
 
     rm_cmd = 'rm -rf %s' % tmp_dir
     execute_system(rm_cmd, '[Msg: Delete <%s> process file done and begin to index ... ]' % sample_name,
                    '[ E: Something wrong with delete <%s> process file after mark duplicate ! ]' % sample_name)
-    # index 使用sambamba会自动产生索引文件
-    # index_cmd = 'samtools index %s' % _duped_bam
-    # execute_system(index_cmd, '[ Msg: <%s> bam index done ! ]' % sample_name,
-    #                '[ E: Something wrong with index <%s> marked dup bam file ! ]' % sample_name)
+
     # # BQSR
     # _bqsr_table = outdir + sample_name + '.recal_data.table'
     # _bqsr_bam = outdir + sample_name + '.BQSR.bam'

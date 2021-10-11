@@ -50,6 +50,8 @@ def ana_args():
     parser.add_argument('--vcf', action="store_true", help='Whether to generate vcf file.')
     parser.add_argument('--qualimap', action="store_true",
                         help='bamQC with qualimap. but maybe it is slowly with large bam.')
+    parser.add_argument('--fast_mark_dup', action='store_true',
+                        help='use sambamba to mark duplication, but when bam was very big, may get something wrong')
     # bam qc
     parser.add_argument('--bam', help='bam file for qc. (after sort and index)')
     # tGT && sGT
@@ -109,6 +111,7 @@ def ana_args():
         else:
             args_dict['inDir'] = args.indir
         args_dict['vcf'] = args.vcf
+        args_dict['fast_mark_dup'] = args.fast_mark_dup
     elif args_dict['fun'] == 'tGT':
         if args.proband and args.father and args.mother:
             args_dict['pgVCF'] = os.path.realpath(args.proband)
@@ -162,7 +165,7 @@ def main():
     args = ana_args()
     if args['fun'] == 'f2v':
         f2v(args['inDir'], args['outPath'], args['thread'], args['scriptPath'], args['vcf'], args['qualimap'],
-            args['bed'])
+            args['bed'], args['fast_mark_dup'])
     elif args['fun'] == 'tGT':
         trio_gt(args['pgVCF'], args['fgVCF'], args['mgVCF'], args['sgVCF'], args['outPath'], args['scriptPath'])
     elif args['fun'] == 'sGT':

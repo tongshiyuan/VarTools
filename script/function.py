@@ -39,7 +39,7 @@ def readConfig(configFile):
     return confDict
 
 
-def f2v(inDir, outDir, thread, scriptPath, vcf, bq, bed):
+def f2v(inDir, outDir, thread, scriptPath, vcf, bq, bed, fmd):
     rst = check_software('samtools')
     if rst:
         sys.exit()
@@ -65,8 +65,10 @@ def f2v(inDir, outDir, thread, scriptPath, vcf, bq, bed):
     os.makedirs(bam_report_dir)
     bam_tmp_dir = outDir + '/' + sampleName + '/tmp'
     # os.makedirs(bam_tmp_dir)
-    bamfile = align_deal(fqOutDir, bamOutdir, sampleName, config['reference'], bam_report_dir, bam_tmp_dir,
-                         config['mapping'], config['alnProcess'], thread, scriptPath, bq, config['ref_version'], bed)
+    bamfile = align_deal(fqOutDir, bamOutdir, sampleName, config['reference'],
+                         bam_report_dir, bam_tmp_dir,
+                         config['mapping'], config['alnProcess'],
+                         thread, scriptPath, bq, config['ref_version'], bed, fmd)
     print('[ Msg: All sample mapping done ! ]')
     print('[ Msg: Waiting for gatk calling done ... ]')
     # short variants calling
