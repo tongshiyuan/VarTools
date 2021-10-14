@@ -60,7 +60,7 @@ def check_tmp(tmp_dir, out_dir):
 def f2v(in_dir, out_dir, bed, prefix,
         vcf, fqc, bq,
         fmd, rm_dup, frmd,
-        thread, script_path, config_file, tmp_dir, keep_tmp):
+        thread, script_path, config_file, tmp_dir, keep_tmp, gender_rate):
     rst = check_software('samtools')
     if rst:
         sys.exit('[ Error: Can not open <samtools>.]')
@@ -100,7 +100,7 @@ def f2v(in_dir, out_dir, bed, prefix,
                         sample_name, config['reference'],
                         config['mapping'],
                         thread, script_path, bq, config['ref_version'],
-                        bed, sbb, rmd, fp_rmd, config['platform'], keep_tmp)
+                        bed, sbb, rmd, fp_rmd, config['platform'], keep_tmp, gender_rate)
     print('[ Msg: All sample mapping done ! ]')
     if not keep_tmp:
         rm_cmd = 'rm -rf %s %s' % (fq1, fq2)
@@ -129,9 +129,9 @@ def f2v(in_dir, out_dir, bed, prefix,
             gender_determined(vcf_file)
 
 
-def bamQC(bam, bed, out_dir, tmp_dir, script_path, thread, bq, keep_tmp):
+def bamQC(bam, bed, out_dir, tmp_dir, script_path, thread, bq, keep_tmp, gender_rate):
     tmp_dir = check_tmp(tmp_dir, out_dir)
-    bam_stats(bam, out_dir, thread, tmp_dir, script_path, bq, '', bed, keep_tmp)
+    bam_stats(bam, out_dir, thread, tmp_dir, script_path, bq, '', bed, keep_tmp, gender_rate)
 
 
 def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, out_dir, script_path, config_file, keep_tmp, tmp_dir, bed, prefix):
@@ -156,7 +156,6 @@ def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, out_dir, script_path, config_file, 
                config['reference'], config['gatk_bundle'], script_path, prefix, bed,
                tmp_dir, keep_tmp)
     affinity(vcf, aff_dir, script_path)
-    gender_determined(vcf)
 
 
 def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config_file):
@@ -165,7 +164,6 @@ def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config
     report_dir = out_dir + '/vcfQC'
     os.makedirs(report_dir)
     vcf = gatk_hard_filter(gvcf, out_dir, report_dir, tmp_dir, prefix, config['reference'], script_path, bed, keep_tmp)
-    gender_determined(vcf)
 
 
 def burden_test(case, control, case_matrix, control_matrix,
@@ -200,6 +198,32 @@ def burden_test(case, control, case_matrix, control_matrix,
             control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
     rank_df = burden(case_matrix, control_matrix, cutoff=cutoff)
     rank_df.to_csv(out_dir + '/gene_rank.txt', index=False, sep='\t')
+
+
+def gender_identify(bam, bed, out_dir, thread, script_path, rate):
+    if os.path.isdir(out_dir):
+        rm_tmp = False
+    else:
+        os.makedirs(out_dir)
+        rm_tmp = True
+    x, y = 0, 0
+    with open(bed) as f:
+        for i in f:
+            if i.startswith('X') or i.startswith('chrX'):
+                x += 1
+            elif i.startswith('Y') or i.startswith('chrY'):
+                y += 1
+    if not x or not y:
+        sys.exit('[ Error: XY chromosome coverage incomplete.]')
+    depth_file_prefix = out_dir + '/' + bam.split('/')[-1].rstrip('.bam')
+    depth_cmd = script_path + '/bin/mosdepth -n -t %d -b %s -T 1,10,20,30 %s %s' % (
+        thread, bed, depth_file_prefix, bam)
+    execute_system(depth_cmd, '[ Msg: bam stat depth done ! ]', '[ Error: Something wrong with bam stat depth ! ]')
+    gender = gender_determined(depth_file_prefix + '.thresholds.bed.gz', rate)
+    if rm_tmp:
+        os.system('rm -rf %s' % out_dir)
+    else:
+        os.system('rm -rf %s*' % depth_file_prefix)
 
 
 def trio_analysis():

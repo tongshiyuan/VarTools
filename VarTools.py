@@ -17,7 +17,7 @@ import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt, burden_test, bamQC
+from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify
 from script.case_control import build_snvdb
 
 
@@ -39,7 +39,6 @@ def format_time(seconds):
         m = (seconds % 86400) % 3600 // 60
         s = (seconds % 86400) % 3600 % 60
         tim = '%d day %d h %d min %d s.' % (d, h, m, s)
-    print(tim)
     return tim
 
 
@@ -68,6 +67,7 @@ def f2v_args(args):
     argsd['tmp_dir'] = args.tmp_dir
     argsd['keep_tmp'] = args.keep_tmp
     argsd['config'] = args.config
+    argsd['gender_rate'] = args.rate
     return argsd
 
 
@@ -84,6 +84,7 @@ def bqc_args(args):
     argsd['thread'] = args.thread
     argsd['tmp_dir'] = args.tmp_dir
     argsd['keep_tmp'] = args.keep_tmp
+    argsd['gender_rate'] = args.rate
     return argsd
 
 
@@ -166,6 +167,20 @@ def cc_args(args):
     return argsd
 
 
+def gd_args(args):
+    argsd = {}
+    if not args.bam:
+        sys.exit('[ Error: Parameter is incomplete ! ]')
+    else:
+        argsd['bam'] = args.bam
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['thread'] = args.thread
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['rate'] = args.rate
+    return argsd
+
+
 def ana_args():
     description = '=' * 77 + '\nVarTools 0.1.0 20211011\nWorkflow of WGS/WES analysis.\n' + '=' * 77
     print(description)
@@ -197,6 +212,7 @@ function of VarTools:
         'sSV': 'call single SV with clinSV (only for WGS).',
         'sA': 'single case analysis.',
         'tA': 'trio analysis.',
+        'gd': 'identify gender from bam coverage.'
     }
 
     if len(sys.argv) == 1 or sys.argv[1] in ['--help', 'help', '-h']:
@@ -229,6 +245,8 @@ function of VarTools:
         parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
         parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
         parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        parser.add_argument('-r', '--gender_rate', default=20, type=float,
+                            help='coverage rate of X/Y for calculate gender [20].')
         args = parser.parse_args()
         args_dict = f2v_args(args)
     elif sys.argv[1] == 'bqc':
@@ -245,6 +263,8 @@ function of VarTools:
         parser.add_argument('--tmp_dir', default=False,
                             help='temp directory, if not, it will create in the result directory.')
         parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('-r', '--gender_rate', default=20, type=float,
+                            help='coverage rate of X/Y for calculate gender [20].')
         args = parser.parse_args()
         args_dict = bqc_args(args)
     elif sys.argv[1] == 'tGT':
@@ -313,6 +333,18 @@ function of VarTools:
         parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
         args = parser.parse_args()
         args_dict = cc_args(args)
+    elif sys.argv[1] == 'gd':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s gd [options] -b bam -d bed')
+        parser.description = function['gd']
+        parser.add_argument('gd')
+        parser.add_argument('-b', '--bam', help='bam file for gender identify. (after sort and index).')
+        parser.add_argument('-d', '--bed', default=False,
+                            help='regions of interest. If WGS file, can use bed in \'lib\' or set by your self.')
+        parser.add_argument('--tmp_dir', default='./.tmp_dir_for_gd', help='temp directory [./.tmp_dir_for_gd].')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('-r', '--rate', default=20, type=float, help='coverage rate of X/Y [20].')
+        args = parser.parse_args()
+        args_dict = gd_args(args)
     else:
         sys.exit('[ Error: Can not identify the function of <%s>]' % sys.argv[1])
 
@@ -329,11 +361,11 @@ def main():
         f2v(args['in_dir'], args['out_dir'], args['bed'], args['prefix'],
             args['vcf'], args['fastqc'], args['qualimap'],
             args['fast_mark_dup'], args['rm_dup'], args['fast_rm_dup'],
-            args['thread'], args['script_path'], args['config'], args['tmp_dir'], args['keep_tmp'])
+            args['thread'], args['script_path'], args['config'], args['tmp_dir'], args['keep_tmp'], args['gender_rate'])
 
     elif args['fun'] == 'bqc':
         bamQC(args['bam'], args['bed'], args['out_dir'], args['tmp_dir'],
-              args['script_path'], args['thread'], args['qualimap'], args['keep_tmp'])
+              args['script_path'], args['thread'], args['qualimap'], args['keep_tmp'], args['gender_rate'])
 
     elif args['fun'] == 'tGT':
         trio_gt(args['p_gvcf'], args['f_gvcf'], args['m_gvcf'], args['s_gvcfs'],
@@ -358,6 +390,8 @@ def main():
                     args['out_dir'], args['fp'], args['mode'], args['cutoff'],
                     args['cc_default'], args['gene'], args['score'], args['script_path'], args['config'])
 
+    elif args['fun'] == 'gd':
+        gender_identify(args['bam'], args['bed'], args['tmp_dir'], args['thread'], args['script_path'], args['rate'])
     elif args['fun'] == 'tA':
         pass
     elif args['fun'] == 'sA':

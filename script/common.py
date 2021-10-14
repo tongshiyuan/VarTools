@@ -157,5 +157,35 @@ def affinity(vcf, aff_dir, script_path):
             rm.close()
 
 
-def gender_determined(vcf):
-    pass
+def gender_determined(depth_file, rate=20):
+    x_region, x_bases, y_region, y_bases = 0, 0, 0, 0
+    if depth_file.endswith('gz'):
+        with gzip.open(depth_file, 'rb') as f:
+            for line in f:
+                de_line = line.decode().split('\t')
+                if de_line[0].startswith('X') or de_line[0].startswith('chrX'):
+                    x_region += eval(de_line[2]) - eval(de_line[1])
+                    x_bases += eval(de_line[4])
+                elif de_line[0].startswith('Y') or de_line[0].startswith('chrY'):
+                    y_region += eval(de_line[2]) - eval(de_line[1])
+                    y_bases += eval(de_line[4])
+    else:
+        with open(depth_file) as f:
+            for line in f:
+                de_line = line.split('\t')
+                if de_line[0].startswith('X') or de_line[0].startswith('chrX'):
+                    x_region += eval(de_line[2]) - eval(de_line[1])
+                    x_bases += eval(de_line[4])
+                elif de_line[0].startswith('Y') or de_line[0].startswith('chrY'):
+                    y_region += eval(de_line[2]) - eval(de_line[1])
+                    y_bases += eval(de_line[4])
+    if not x_region or not y_region:
+        print('[ Error: XY chromosome coverage incomplete.]')
+        return ''
+    else:
+        if (x_bases / x_region) / (y_bases / y_region) > rate:
+            print('[ Msg: This sample may FEMALE.]')
+            return 'female'
+        else:
+            print('[ Msg: This sample may MALE.]')
+            return 'male'

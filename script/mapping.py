@@ -1,12 +1,12 @@
 import os
 import pandas as pd
-from script.common import execute_system, get_raw_info, check_software
+from script.common import execute_system, get_raw_info, check_software, gender_determined
 
 
 def bam_deal(fq1, fq2, out_dir, report_dir, tmp_dir,
              sample_name, reference,
              software, thread, script_path,
-             bq, ver, bed, fmd, rmd, fp_rmd, platform, keep_tmp):
+             bq, ver, bed, fmd, rmd, fp_rmd, platform, keep_tmp, gender_rate):
     sorted_bam = align(fq1, fq2, tmp_dir, sample_name, reference, software, thread, script_path, platform, tmp_dir)
     # mark duplicate
     duped_bam = '%s/%s.sorted.merge.markdup.bam' % (out_dir, sample_name)
@@ -36,7 +36,7 @@ def bam_deal(fq1, fq2, out_dir, report_dir, tmp_dir,
             index_cmd = 'samtools index %s' % duped_bam
             execute_system(index_cmd, '[ Msg: <%s> bam index done ! ]' % sample_name,
                            '[ Error: Something wrong with index <%s> marked dup bam file ! ]' % sample_name)
-    bam_stats(duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed, keep_tmp)
+    bam_stats(duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed, keep_tmp, gender_rate)
     return duped_bam
 
 
@@ -45,15 +45,15 @@ def align(fq1, fq2, out_dir, prefix, reference, software, thread, script_path, p
     # 比对、转换、排序
     if software == 'bwa':
         tmp_prefix = tmp_dir + '/' + prefix
-        _out_bam = bwa_mem2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path, platform, tmp_prefix)
+        out_bam = bwa_mem2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path, platform, tmp_prefix)
     elif software == 'bowtie2':
-        _out_bam = bowtie2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path)
+        out_bam = bowtie2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path)
     elif software == 'gg':
-        _out_bam = graph_genome(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb)
+        out_bam = graph_genome(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb)
     else:
         exit('[ Error: Do not support <%s> to mapping ! ]' % software)
-        _out_bam = ''
-    return _out_bam
+        out_bam = ''
+    return out_bam
 
 
 def bwa_mem2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path, platform, tmp_prefix):
@@ -134,7 +134,7 @@ def graph_genome(fq1, fq2, _out_bam, reference, sample_name, thread, _id, _lb):
     return _out_bam
 
 
-def bam_stats(duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed, keep_tmp):
+def bam_stats(duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed, keep_tmp, gender_rate):
     if bq:
         rst = check_software('qualimap')
         if rst:
@@ -153,10 +153,10 @@ def bam_stats(duped_bam, report_dir, thread, tmp_dir, script_path, bq, ver, bed,
         bed_file = script_path + '/lib/Hg19.genome.bed'
     else:
         bed_file = bed
-    bam_qc(duped_bam, report_dir, tmp_dir, script_path, thread, bed_file, keep_tmp)
+    bam_qc(duped_bam, report_dir, tmp_dir, script_path, thread, bed_file, keep_tmp, gender_rate)
 
 
-def bam_qc(bam, report_dir, tmp_dir, script_path, thread, bed_file, keep_tmp):
+def bam_qc(bam, report_dir, tmp_dir, script_path, thread, bed_file, keep_tmp, gender_rate):
     base_cov, _start, end = 0, 0, 0
     _chr = ['chr1', '1']
     bamqc_dict = {}
@@ -185,20 +185,21 @@ def bam_qc(bam, report_dir, tmp_dir, script_path, thread, bed_file, keep_tmp):
     bamqc_dict['base_cov'] = base_cov
     # 比对率、平均测序深度
     new_target_file = tmp_dir + '/tmp_target.txt'
-    single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_path, thread, keep_tmp)
+    single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_path, thread, keep_tmp, gender_rate)
     if not keep_tmp:
         os.system('rm -rf %s' % new_target_file)
     print('[ Msg: Bam QC done！]')
 
 
-def single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_path, thread, keep_tmp):
+def single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_path, thread, keep_tmp, gender_rate):
     result_dict = {
         'target_dep_num': 0,
         'dep_1x': 0,
         'dep_10x': 0,
         'dep_20x': 0,
         'dep_30x': 0,
-        'mapping_rate': 0
+        'mapping_rate': 0,
+        'gender': ''
     }
     # flagstat
     flag_cmd = 'samtools flagstat -@ %d %s > %s' % (thread, bam, report_dir + '/flagstat.txt')
@@ -234,6 +235,8 @@ def single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_pa
         print('[ Error: Something wrong with bam stat depth ! ]')
     else:
         print('[ Msg: bam stat depth done ! ]')
+        gender = gender_determined(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz', gender_rate)
+        result_dict['gender'] = gender
         data = pd.read_table(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz',
                              low_memory=False,
                              compression='gzip')
@@ -250,7 +253,6 @@ def single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_pa
         result_dict['dep_10x'] = p10
         result_dict['dep_20x'] = p20
         result_dict['dep_30x'] = p30
-
         df = pd.read_table(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.mosdepth.summary.txt')
         df = df[df['chrom'].isin(
             ['chr1', 'chr2', 'chr3', 'chr4', 'chr5', 'chr6', 'chr7', 'chr8', 'chr9', 'chr10', 'chr11', 'chr12', 'chr13',
