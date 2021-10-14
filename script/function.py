@@ -206,6 +206,9 @@ def gender_identify(bam, bed, out_dir, thread, script_path, rate):
     else:
         os.makedirs(out_dir)
         rm_tmp = True
+    bed_cmd = 'grep \'[XY]\' %s > %s' % (bed, out_dir + '/xy.bed')
+    bed = out_dir + '/xy.bed'
+    os.system(bed_cmd)
     x, y = 0, 0
     with open(bed) as f:
         for i in f:
@@ -214,6 +217,10 @@ def gender_identify(bam, bed, out_dir, thread, script_path, rate):
             elif i.startswith('Y') or i.startswith('chrY'):
                 y += 1
     if not x or not y:
+        if rm_tmp:
+            os.system('rm -rf %s' % out_dir)
+        else:
+            os.system('rm -rf %s' % bed)
         sys.exit('[ Error: XY chromosome coverage incomplete.]')
     depth_file_prefix = out_dir + '/' + bam.split('/')[-1].rstrip('.bam')
     depth_cmd = script_path + '/bin/mosdepth -n -t %d -b %s -T 1,10,20,30 %s %s' % (
@@ -223,7 +230,7 @@ def gender_identify(bam, bed, out_dir, thread, script_path, rate):
     if rm_tmp:
         os.system('rm -rf %s' % out_dir)
     else:
-        os.system('rm -rf %s*' % depth_file_prefix)
+        os.system('rm -rf %s* %s' % (depth_file_prefix, bed))
 
 
 def trio_analysis():

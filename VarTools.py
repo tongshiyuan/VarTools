@@ -190,14 +190,17 @@ function of VarTools:
     (1) f2v: analysis from fastq to gvcf. 
     (2) tGT: from gvcf created by GATK to vcf in trio mode.
     (3) sGT: from gvcf created by GATK to vcf in single mode.
-    (4) tSV: call trio SV with clinSV (only for WGS).
-    (5) sSV: call single SV with clinSV (only for WGS).
-    (6) tA: trio analysis.
-    (7) sA: single case analysis.
-    (8) fp: create false positive database from vcf files or avinput files.
-    (9) cc: case-control analysis with GRIPT.
-    (10) bt: Burden testing with TRAPD.
-    (11) bqc: bam quality check.
+    (4) fp: create false positive database from vcf files or avinput files.
+    (5) cc: case-control analysis with GRIPT.
+    (6) bqc: bam quality check.
+    (7) gd: gender identify.
+    ----------
+    (8) tSV: call trio SV with clinSV (only for WGS).
+    (9) sSV: call single SV with clinSV (only for WGS).
+    (10) tA: trio analysis.
+    (11) sA: single case analysis.
+    (12) bt: Burden testing with TRAPD.
+    -----------
     To get help on a particular command, call it with -h/--help.
     '''
     function = {
