@@ -29,77 +29,100 @@ def check_software(soft):
 def check_system():
     # 查看系统python
     if platform.python_version() < '3.0.0':
-        sys.exit('[ E: Please use it by python3.x ! ]')
+        sys.exit('[ Error: Please use it by python3.x ! ]')
     # 确保这些一定会使用到的软件存在
     software = ['samtools', 'plot-bamstats', 'qualimap', 'bcftools', 'R', 'bgzip']
     for _ in software:
         check_software(_)
 
 
-def fastq_prework(indir, max_process):
-    # indir = os.path.abspath(indir)
-    # outdir = os.path.abspath(outdir)
-    # report_dir = os.path.abspath(report_dir)
-    sample_name = []
-    # for file in os.listdir(indir):
-    #     if re.findall(r'(1\.fq\.gz|1\.fastq\.gz|1\.fq|1\.fastq)$', file):
-    #         sample_name.append(file)
-    # if max_process >= len(sample_name):
-    #     max_process = len(sample_name)
-    tmp_file_name = []
-    for file in os.listdir(indir):
-        if re.findall(r'(\.fq\.gz|\.fastq\.gz|\.fq|\.fastq)$', file):
+def paired_fq(fq1, kw1, kw2):
+    if fq1.count(kw1) == 1:
+        fq2 = fq1.replace(kw1, kw2)
+        sfn = fq1.replace(kw1, '_')
+        sfn = re.sub(r'(\.fq\.gz|\.fastq\.gz|\.fq|\.fastq|_fq\.gz|_fq|_fastq|_fastq\.gz)$', '', sfn)
+    else:
+        rec = fq1.split(kw1)
+        fq2 = kw1.join(rec[:-1]) + kw2 + rec[-1]
+        sfn = kw1.join(rec[:-1]) + '_' + rec[-1]
+        sfn = re.sub(r'(\.fq\.gz|\.fastq\.gz|\.fq|\.fastq|_fq\.gz|_fq|_fastq|_fastq\.gz)$', '', sfn)
+    return fq2, sfn
+
+
+def fastq_prework(in_dir):
+    tmp_file_name, fq1_list, fq2_list = [], [], []
+    for file in os.listdir(in_dir):
+        if re.findall(r'(\.fq\.gz|\.fastq\.gz|\.fq|\.fastq|_fq\.gz|_fq|_fastq|_fastq\.gz)$', file):
             tmp_file_name.append(file)
-    # check name
-    _ex = tmp_file_name[0]
-    name_info = _ex.split('_')
-    # for info in name_info:
-    if name_info[-1][0] in ['1', '2'] and name_info[-2].startswith('L'):
-        for file in tmp_file_name:
-            if re.findall(r'(1\.fq\.gz|1\.fastq\.gz|1\.fq|1\.fastq)$', file):
-                sample_name.append(file)
-        name_state = 'novo'
-    elif name_info[-2] in ['R1', 'R2'] and name_info[-3].startswith('L'):
-        for file in tmp_file_name:
-            if file.split('_')[-2] == 'R1':
-                sample_name.append(file)
-        name_state = 'giab'
-    elif _ex.find('R1') != -1 or _ex.find('R2') != -1:
-        for file in tmp_file_name:
-            if file.find('R1') != -1:
-                sample_name.append(file)
-        name_state = 'other'
-    else:
-        sys.exit('[ E: Can not analysis input raw data name <%s>]' % _ex)
-    if max_process >= len(sample_name):
-        max_process = len(sample_name)
-    return indir, max_process, sample_name, name_state
-
-
-# def get_raw_info(name_in, state):
-#     # W2018005_NZTD180700064_H5MYLDSXX_L3_1.fq.gz
-#     # NA24695_CTTGTA_L002_R2_014.fastq.gz
-#     info = name_in.split('_')
-#     if state == 'novo':
-#         return info[0], info[0], info[3]
-#     elif state == 'giab':
-#         return info[0], info[0], info[2]
-#     else:
-#         return info[0], info[0], info[0]
-
-def get_raw_info(fq1, state):
+    if len(tmp_file_name) < 2 or len(tmp_file_name) % 2 == 1:
+        sys.exit('[ Error: Can not identify paired fastq data. Please check! ]')
+    # check name: xxx_1.fq.gz, xxx.1.fq.gz, xxx_1_xxx.fq.gz, xxx_R1_xxx.fq.gz, xxx.R1.xxx.fq.gz
     # W2018005_NZTD180700064_H5MYLDSXX_L3_1.fq.gz
-    # NA24695_CTTGTA_L002_R2_014.fastq.gz
-    name_in = fq1.split('/')[-1]
-    info = name_in.split('_')
-    if state == 'novo':
-        return info[0], info[2], info[3]
-    else:
+    # NA24695_CTTGTA_L002_R1_014.fastq.gz
+    for fq in tmp_file_name:
+        if fq.find('.R1.') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '.R1.', '.R2.')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        elif fq.find('_R1_') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '_R1_', '_R2_')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        elif fq.find('_R1.') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '_R1.', '_R2.')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        elif fq.find('.1.') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '.1.', '.2.')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        elif fq.find('_1_') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '_1_', '_2_')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        elif fq.find('_1.') != -1:
+            fq1_list.append(fq)
+            fq2, sfn = paired_fq(fq, '_1.', '_2.')
+            if fq2 in tmp_file_name:
+                fq2_list.append(fq2)
+            else:
+                sys.exit('[ Error: Can not find paired file of <%s>]' % fq)
+        # else:
+        #     sys.exit('[ Error: Can not identify fastq file structure of <%s>]' % fq)
+    if len(tmp_file_name) != len(fq1_list) + len(fq2_list):
+        sys.exit('[ Error: Some fastq file structure can not be identified. ]')
+    if len(fq1_list) != len(fq2_list):
+        sys.exit('[ Error: Something wrong with identify fastq data. ]')
+    return fq1_list, fq2_list
+
+
+def get_raw_info(fq1):
+    if fq1.endswith('.gz'):
         with gzip.open(fq1, 'rb') as f:
             header = f.readline().decode()
             _lb = header.split(':')[2]
             _id = header.split(':')[3]
-        return info[0], _lb, _id
+    else:
+        with open(fq1) as f:
+            header = f.readline()
+            _lb = header.split(':')[2]
+            _id = header.split(':')[3]
+    return _lb, _id
 
 
 def get_row_num(tmp_result, header):
@@ -110,22 +133,22 @@ def get_row_num(tmp_result, header):
     return num + 1
 
 
-def affinity(vcf, affDir, scriptPath):
-    plinkCmd = scriptPath + '/bin/plink --double-id --vcf %s --make-bed --out %s --allow-extra-chr' \
-               % (vcf, affDir + '/aff')
-    rst = os.system(plinkCmd)
+def affinity(vcf, aff_dir, script_path):
+    plink_cmd = script_path + '/bin/plink --double-id --vcf %s --make-bed --out %s --allow-extra-chr' \
+                % (vcf, aff_dir + '/aff')
+    rst = os.system(plink_cmd)
     if rst:
-        print('[ W: fail to make bed！]')
+        print('[ Warn: fail to make bed！]')
         return 0
     else:
         print('[ Msg: make bed done! ]')
-        kingCmd = scriptPath + '/bin/king -b %s --kinship --prefix %s ' % (affDir + '/aff.bed', affDir + '/aff')
-        rst = os.system(kingCmd)
+        king_cmd = script_path + '/bin/king -b %s --kinship --prefix %s ' % (aff_dir + '/aff.bed', aff_dir + '/aff')
+        rst = os.system(king_cmd)
         if rst:
-            print('[ W: fail to run kingship ！]')
+            print('[ Warn: fail to run kingship ！]')
         else:
             print('[ Msg: calculate affinity done! ]')
-            rm = open(affDir + '/readme.txt', 'w')
+            rm = open(aff_dir + '/readme.txt', 'w')
             rm.write('说明：当 Kinship > 0.354，可能为同一样本或者孪生兄弟姐妹；\n')
             rm.write('     当 Kinship 在[0.177, 0.354]内，为一级亲缘；\n')
             rm.write('     当 Kinship 在[0.0884, 0.177]内，为二级亲缘；\n')

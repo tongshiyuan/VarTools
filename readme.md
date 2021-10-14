@@ -15,7 +15,7 @@
 
 ### f2v
 ~~~(shell)
-python3 VarTools f2v -i indir  -o ./result
+python3 VarTools.py f2v -i in_dir -o out_dir -b bed -p prefix --vcf --fastqc --qualimap --keep_tmp -t 6
 ~~~
 
 ### trio_genotype
@@ -59,6 +59,7 @@ python3 VarTools fp -i indir -o ./result --snvdb false_positive.txt --overlap_ra
 
 ### some files in `lib`
 - hg19.genome.bed
+
 ~~~(shell)
 # Hg38 from GATK
 cut -f 1,2 Hg38.fasta.fai | head -n 24 | sort -k1,1  > Hg38.genome

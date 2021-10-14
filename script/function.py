@@ -2,113 +2,204 @@ import os
 import sys
 import configparser
 from script.qc import fastp_qc
-from script.mapping import align_deal, bam_stats
-from script.calling import gatk_pre, gatk, gatk_hard
-from script.common import check_software, affinity
-from script.annotation import trio_short_variants_filter
+from script.mapping import bam_deal, bam_stats
+from script.calling import gatk_pre, gatk, gatk_hard_filter
+from script.common import check_software, affinity, execute_system, gender_determined
 from script.case_control import get_matrix, burden
 
 
-def readConfig(configFile):
+def read_config(script_path, config_file):
+    if config_file:
+        if os.path.isfile(config_file):
+            pass
+        else:
+            sys.exit('[ Error: Can not open <%s>.]' % config_file)
+    else:
+        config_file = script_path + '/lib/config.ini'
     config = configparser.ConfigParser()
-    config.read(configFile)
-    confDict = {}
-    confDict['reference'] = config.get('global', 'reference')
-    confDict['adapterR1'] = config.get('fastqc', 'adapter_r1')
-    confDict['adapterR2'] = config.get('fastqc', 'adapter_r2')
-    confDict['gatkBundle'] = config.get('database', 'GATK_bundle')
-    confDict['mapping'] = config.get('parameter', 'mapping')
-    confDict['qcProcess'] = int(config.get('fastqc', 'qc_process'))
-    confDict['alnProcess'] = int(config.get('map', 'map_process'))
-    confDict['af_db'] = config.get('anno', 'af_db')
-    confDict['af_type'] = config.get('anno', 'af_type')
-    confDict['gene_db'] = config.get('anno', 'gene_db')
-    confDict['gene_type'] = config.get('anno', 'gene_type')
-    confDict['anno_dir'] = config.get('anno', 'anno_dir')
-    confDict['ref_version'] = config.get('anno', 'ref_version')
+    config.read(config_file)
+    conf_dict = {}
+    conf_dict['reference'] = config.get('global', 'reference')
+    conf_dict['adapterR1'] = config.get('fastqc', 'adapter_r1')
+    conf_dict['adapterR2'] = config.get('fastqc', 'adapter_r2')
+    conf_dict['fastp_cmd'] = config.get('fastqc', 'fastp_cmd')
+    conf_dict['gatk_bundle'] = config.get('database', 'GATK_bundle')
+    conf_dict['mapping'] = config.get('parameter', 'mapping')
+    conf_dict['platform'] = config.get('map', 'platform')
+    conf_dict['caller'] = config.get('call', 'short_var')
+    conf_dict['af_db'] = config.get('anno', 'af_db')
+    conf_dict['af_type'] = config.get('anno', 'af_type')
+    conf_dict['gene_db'] = config.get('anno', 'gene_db')
+    conf_dict['gene_type'] = config.get('anno', 'gene_type')
+    conf_dict['anno_dir'] = config.get('anno', 'anno_dir')
+    conf_dict['ref_version'] = config.get('anno', 'ref_version')
     _ = config.get('filter', 'AFList')
-    confDict['AFList'] = [i.strip() for i in _.split(',')]
-    confDict['AFTh'] = eval(config.get('filter', 'AFThreshold'))
+    conf_dict['AFList'] = [i.strip() for i in _.split(',')]
+    conf_dict['AFTh'] = eval(config.get('filter', 'AFThreshold'))
     _ = config.get('filter', 'ClinList')
-    confDict['ClinList'] = [i.strip() for i in _.split(',')]
+    conf_dict['ClinList'] = [i.strip() for i in _.split(',')]
     # case-control
-    confDict['cc_AF'] = config.get('cc_filter', 'AF_list')
-    confDict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
-    confDict['cc_AF_AR'] = config.get('cc_filter', 'AF_th_AR')
-    confDict['cc_splice'] = config.get('cc_filter', 'splice_list')
-    return confDict
+    conf_dict['cc_AF'] = config.get('cc_filter', 'AF_list')
+    conf_dict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
+    conf_dict['cc_AF_AR'] = config.get('cc_filter', 'AF_th_AR')
+    conf_dict['cc_splice'] = config.get('cc_filter', 'splice_list')
+    return conf_dict
 
 
-def f2v(inDir, outDir, thread, scriptPath, vcf, bq, bed, fmd):
+def check_tmp(tmp_dir, out_dir):
+    if tmp_dir:
+        if not os.path.isdir(tmp_dir):
+            os.makedirs(tmp_dir)
+    else:
+        tmp_dir = out_dir + '/tmp'
+        os.makedirs(tmp_dir)
+    tmp_dir = os.path.abspath(tmp_dir)
+    return tmp_dir
+
+
+def f2v(in_dir, out_dir, bed, prefix,
+        vcf, fqc, bq,
+        fmd, rm_dup, frmd,
+        thread, script_path, config_file, tmp_dir, keep_tmp):
     rst = check_software('samtools')
     if rst:
-        sys.exit()
+        sys.exit('[ Error: Can not open <samtools>.]')
     # 读取参数
-    config = readConfig(scriptPath + '/lib/config.ini')
+    config = read_config(script_path, config_file)
     # 输出目录
-    inDir = os.path.abspath(inDir)
-    outDir = os.path.abspath(outDir)
-    sampleName = os.path.split(os.path.abspath(inDir))[-1]
+    in_dir = os.path.abspath(in_dir)
+    out_dir = os.path.abspath(out_dir)
+    # prefix
+    if prefix:
+        sample_name = prefix
+    else:
+        sample_name = os.path.split(os.path.abspath(in_dir))[-1]
+    # temp directory
+    tmp_dir = check_tmp(tmp_dir, out_dir)
     # QC
     print('[ Msg: QC running ... ]')
-    fqOutDir = outDir + '/' + sampleName + '/tmp'
-    os.makedirs(fqOutDir)
-    fqReportDir = outDir + '/' + sampleName + '/reports/fastqQC'
-    os.makedirs(fqReportDir)
-    fastp_qc(inDir, fqOutDir, fqReportDir, config['adapterR1'], config['adapterR2'], thread, scriptPath,
-             config['qcProcess'])
+    fq_rep_dir = out_dir + '/reports/fastqQC'
+    os.makedirs(fq_rep_dir)
+    # how to mark duplication
+    if frmd:
+        fp_rmd = True
+        sbb, rmd = False, False
+    else:
+        fp_rmd = False
+        sbb = True if fmd else False
+        rmd = True if rm_dup else False
+    fq1, fq2 = fastp_qc(in_dir, tmp_dir, fq_rep_dir, config['adapterR1'], config['adapterR2'],
+                        thread, script_path, sample_name, fp_rmd, fqc, config['fastp_cmd'])
     # mapping
-    print('[ Msg: Waiting for all sample mapping done ... ]')
-    bamOutdir = outDir + '/' + sampleName + '/result'
-    os.makedirs(bamOutdir)
-    bam_report_dir = outDir + '/' + sampleName + '/reports/bamQC'
-    os.makedirs(bam_report_dir)
-    bam_tmp_dir = outDir + '/' + sampleName + '/tmp'
-    # os.makedirs(bam_tmp_dir)
-    bamfile = align_deal(fqOutDir, bamOutdir, sampleName, config['reference'],
-                         bam_report_dir, bam_tmp_dir,
-                         config['mapping'], config['alnProcess'],
-                         thread, scriptPath, bq, config['ref_version'], bed, fmd)
+    print('[ Msg: Waiting for mapping done ... ]')
+    rst_out_dir = out_dir + '/results'
+    os.makedirs(rst_out_dir)
+    bam_rep_dir = out_dir + '/reports/bamQC'
+    os.makedirs(bam_rep_dir)
+    bam_file = bam_deal(fq1, fq2, rst_out_dir, bam_rep_dir, tmp_dir,
+                        sample_name, config['reference'],
+                        config['mapping'],
+                        thread, script_path, bq, config['ref_version'],
+                        bed, sbb, rmd, fp_rmd, config['platform'], keep_tmp)
     print('[ Msg: All sample mapping done ! ]')
+    if not keep_tmp:
+        rm_cmd = 'rm -rf %s %s' % (fq1, fq2)
+        execute_system(rm_cmd, '[Msg: Delete <%s> process fastq done ... ]' % sample_name,
+                       '[ Error: Something wrong with delete <%s> process fastq ! ]' % sample_name)
     print('[ Msg: Waiting for gatk calling done ... ]')
     # short variants calling
-    gvcf_outdir = outDir + '/' + sampleName + '/result'
-    # os.makedirs(gvcf_outdir)
-    gvcf_tmp_dir = outDir + '/' + sampleName + '/tmp'
-    # os.makedirs(gvcf_tmp_dir)
-    gatk_pre(bamfile, gvcf_outdir, gvcf_tmp_dir, config['reference'], sampleName, config['gatkBundle'], scriptPath, vcf)
+    if config['caller'] == 'gatk':
+        gvcf = gatk_pre(bam_file, rst_out_dir, tmp_dir,
+                        config['reference'], sample_name, config['gatk_bundle'], script_path, bed, keep_tmp)
+        if vcf:
+            vcf_rep_dir = out_dir + '/reports/vcfQC'
+            os.makedirs(vcf_rep_dir)
+            vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
+                                        script_path, bed, keep_tmp)
+            gender_determined(vcf_file)
+    else:
+        print(['[ Msg: Now software only calling by gatk. ]'])
+        gvcf = gatk_pre(bam_file, rst_out_dir, tmp_dir,
+                        config['reference'], sample_name, config['gatk_bundle'], script_path, bed, keep_tmp)
+        if vcf:
+            vcf_rep_dir = out_dir + '/reports/vcfQC'
+            os.makedirs(vcf_rep_dir)
+            vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
+                                        script_path, bed, keep_tmp)
+            gender_determined(vcf_file)
 
 
-def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, outDir, scriptPath):
-    config = readConfig(scriptPath + '/lib/config.ini')
+def bamQC(bam, bed, out_dir, tmp_dir, script_path, thread, bq, keep_tmp):
+    tmp_dir = check_tmp(tmp_dir, out_dir)
+    bam_stats(bam, out_dir, thread, tmp_dir, script_path, bq, '', bed, keep_tmp)
+
+
+def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, out_dir, script_path, config_file, keep_tmp, tmp_dir, bed, prefix):
+    config = read_config(script_path, config_file)
     # 输入目录
     if s_gvcfs:
-        # s_gvcfs = s_gvcfs.split(',')
-        # for i, v in enumerate(s_gvcfs):
-        #     s_gvcfs[i] = os.path.realpath(v)
         gatk_gvcf = [p_gvcf, f_gvcf, m_gvcf] + s_gvcfs
     else:
         gatk_gvcf = [p_gvcf, f_gvcf, m_gvcf]
     # 输出目录
-    outDir = os.path.abspath(outDir)  # + '/result'
-    report_dir = outDir + '/variantQC'
-    aff_dir = outDir + '/affinity'
-    vcfDir = outDir + '/vcf'
-    os.makedirs(vcfDir)
+    out_dir = os.path.abspath(out_dir)
+    tmp_dir = check_tmp(tmp_dir, out_dir)
+    report_dir = out_dir + '/vcfQC'
+    aff_dir = out_dir + '/affinity'
     os.makedirs(report_dir)
     os.makedirs(aff_dir)
-    vcf = gatk(gatk_gvcf, vcfDir, report_dir, config['reference'], config['gatkBundle'], scriptPath)
-    affinity(vcf, aff_dir, scriptPath)
+    if prefix:
+        prefix += '.'
+    else:
+        prefix = ''
+    vcf = gatk(gatk_gvcf, out_dir, report_dir,
+               config['reference'], config['gatk_bundle'], script_path, prefix, bed,
+               tmp_dir, keep_tmp)
+    affinity(vcf, aff_dir, script_path)
+    gender_determined(vcf)
 
 
-def single_gt(gvcf, outDir, scriptPath):
-    config = readConfig(scriptPath + '/lib/config.ini')
-    outDir = os.path.abspath(outDir)  # + '/result'
-    report_dir = outDir + '/variantQC'
-    vcfDir = outDir + '/vcf'
-    os.makedirs(vcfDir)
+def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config_file):
+    config = read_config(script_path, config_file)
+    out_dir = os.path.abspath(out_dir)  # + '/result'
+    report_dir = out_dir + '/vcfQC'
     os.makedirs(report_dir)
-    gatk_hard(gvcf, vcfDir, report_dir, config['reference'], scriptPath)
+    vcf = gatk_hard_filter(gvcf, out_dir, report_dir, tmp_dir, prefix, config['reference'], script_path, bed, keep_tmp)
+    gender_determined(vcf)
+
+
+def burden_test(case, control, case_matrix, control_matrix,
+                out_dir, fp, mode, cutoff, method, gene, score, script_path, config_file):
+    config = read_config(script_path, config_file)
+    # path
+    out_dir = os.path.abspath(out_dir)
+    out_case = out_dir + '/case_out'
+    out_control = out_dir + '/control_out'
+    os.makedirs(out_case)
+    os.makedirs(out_control)
+
+    if method:
+        # case
+        if case and not case_matrix:
+            case_matrix = get_matrix(case, 'CASE_', config, out_case, mode, snvdb=fp)
+            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
+        # control
+        if control and not control_matrix:
+            control_matrix = get_matrix(control, 'CONTROL_', config, out_control, mode, snvdb=fp)
+            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
+    else:
+        # case
+        if case and not case_matrix:
+            case_matrix = get_matrix(case, 'CASE_', config, mode=mode, gene_col_name=gene, score_col_name=score,
+                                     snvdb=fp, pattern=False)
+            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
+        # control
+        if control and not control_matrix:
+            control_matrix = get_matrix(control, 'CONTROL_', config, mode=mode, gene_col_name=gene,
+                                        score_col_name=score, snvdb=fp, pattern=False)
+            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
+    rank_df = burden(case_matrix, control_matrix, cutoff=cutoff)
+    rank_df.to_csv(out_dir + '/gene_rank.txt', index=False, sep='\t')
 
 
 def trio_analysis():
@@ -121,40 +212,3 @@ def trio_analysis():
     #                            config['AFTh'],
     #                            config['anno_dir'], config['ref_version'], thread)
     # print('[ Msg: All sample gatk calling done ! ]')
-
-
-def burden_test(case, control, case_matrix, control_matrix,
-                out_dir, snvdb, mode, cutoff, method, gene, score, scriptPath):
-    config = readConfig(scriptPath + '/lib/config.ini')
-    out_case = out_dir + '/case_out'
-    os.makedirs(out_case)
-    out_control = out_dir + '/control_out'
-    os.makedirs(out_control)
-    if method:
-        # case
-        if case and not case_matrix:
-            case_matrix = get_matrix(case, 'CASE_', config, out_case, mode, snvdb=snvdb)
-            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
-        # control
-        if control and not control_matrix:
-            control_matrix = get_matrix(control, 'CONTROL_', config, out_control, mode, snvdb=snvdb)
-            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
-    else:
-        # case
-        if case and not case_matrix:
-            case_matrix = get_matrix(case, 'CASE_', config, mode=mode, gene_col_name=gene, score_col_name=score,
-                                     snvdb=snvdb, pattern=False)
-            case_matrix.to_csv(out_case + '/case_matrix.txt', index=False, sep='\t')
-        # control
-        if control and not control_matrix:
-            control_matrix = get_matrix(control, 'CONTROL_', config, mode=mode, gene_col_name=gene,
-                                        score_col_name=score, snvdb=snvdb, pattern=False)
-            control_matrix.to_csv(out_control + '/control_matrix.txt', index=False, sep='\t')
-    rank_df = burden(case_matrix, control_matrix, cutoff=cutoff)
-    rank_df.to_csv(out_dir + '/gene_rank.txt', index=False, sep='\t')
-
-
-def bamQC(bam, bed, out_dir, script_path, thread, bq):
-    tmp_dir = out_dir + '/tmp_dir'
-    os.makedirs(tmp_dir)
-    bam_stats(bam, out_dir, thread, tmp_dir, script_path, bq, '', bed)

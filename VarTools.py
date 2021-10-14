@@ -11,6 +11,7 @@
 # 21.09.03: 修改传入参数，添加GRIPT版case-control (未根据源码而是根据论文复现，会存在与原工具的结果差异)
 # 21.09.08: GRIPT方法的case-control测试完毕，开始复现TRAPD版的burden
 # 21.10.08: 重构 bam qc
+# 21.10.14: 引入高速模式，调整传参模式, 重构部分代码
 ##################################################
 import os
 import sys
@@ -20,11 +21,157 @@ from script.function import f2v, trio_gt, single_gt, burden_test, bamQC
 from script.case_control import build_snvdb
 
 
+def format_time(seconds):
+    if seconds < 60:
+        tim = '%d s.' % seconds
+    elif seconds < 3600:
+        m = seconds // 60
+        s = seconds % 60
+        tim = '%d min %d s.' % (m, s)
+    elif seconds < 86400:
+        h = seconds // 3600
+        m = (seconds % 3600) // 60
+        s = (seconds % 3600) % 60
+        tim = '%d h %d min %d s.' % (h, m, s)
+    else:
+        d = seconds // 86400
+        h = (seconds % 86400) // 3600
+        m = (seconds % 86400) % 3600 // 60
+        s = (seconds % 86400) % 3600 % 60
+        tim = '%d day %d h %d min %d s.' % (d, h, m, s)
+    print(tim)
+    return tim
+
+
+def check_bed(bed):
+    if bed and not os.path.isfile(bed):
+        sys.exit('[ Error: Can not find bed file!]')
+
+
+def f2v_args(args):
+    argsd = {}
+    if not args.in_dir:
+        sys.exit('[ Error: Parameter is incomplete ! ]')
+    else:
+        argsd['in_dir'] = args.in_dir
+    argsd['out_dir'] = args.out_dir
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['prefix'] = args.prefix
+    argsd['vcf'] = args.vcf
+    argsd['fastqc'] = args.fastqc
+    argsd['qualimap'] = args.qualimap
+    argsd['fast_mark_dup'] = args.fast_mark_dup
+    argsd['rm_dup'] = args.rm_dup
+    argsd['fast_rm_dup'] = args.fast_rm_dup
+    argsd['thread'] = args.thread
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['keep_tmp'] = args.keep_tmp
+    argsd['config'] = args.config
+    return argsd
+
+
+def bqc_args(args):
+    argsd = {}
+    if not args.bam:
+        sys.exit('[ Error: Parameter is incomplete ! ]')
+    else:
+        argsd['bam'] = args.bam
+    argsd['out_dir'] = args.out_dir
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['qualimap'] = args.qualimap
+    argsd['thread'] = args.thread
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['keep_tmp'] = args.keep_tmp
+    return argsd
+
+
+def tGT_args(args):
+    argsd = {}
+    if not args.proband or not args.father or not args.mother:
+        sys.exit('[ Error: Trio sample incomplete ! ]')
+    else:
+        argsd['p_gvcf'] = os.path.realpath(args.proband)
+        argsd['f_gvcf'] = os.path.realpath(args.father)
+        argsd['m_gvcf'] = os.path.realpath(args.mother)
+        if args.sibling:
+            siblings = args.sibling
+            argsd['s_gvcfs'] = [os.path.realpath(_.strip(' ')) for _ in siblings.split(',')]
+            print('[ Msg: find %d sibling. ]' % len(argsd['s_gvcfs']))
+    argsd['out_dir'] = args.out_dir
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['prefix'] = args.prefix
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['keep_tmp'] = args.keep_tmp
+    argsd['config'] = args.config
+    return argsd
+
+
+def sGT_args(args):
+    argsd = {}
+    if not args.gvcf:
+        sys.exit('[ Error: Sample incomplete ! ]')
+    else:
+        argsd['gvcf'] = os.path.realpath(args.gvcf)
+    argsd['out_dir'] = args.out_dir
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['keep_tmp'] = args.keep_tmp
+    argsd['prefix'] = args.prefix
+    argsd['config'] = args.config
+    return argsd
+
+
+def fp_args(args):
+    argsd = {}
+    if not args.in_dir:
+        sys.exit('[ Error: Parameter is incomplete ! ]')
+    else:
+        argsd['in_dir'] = args.in_dir
+    argsd['outfile'] = args.outfile
+    argsd['file_type'] = args.file_type
+    argsd['overlap_rate'] = args.overlap_rate
+    argsd['tmp_dir'] = args.tmp_dir
+    return argsd
+
+
+def cc_args(args):
+    argsd = {}
+    if (args.case or args.case_matrix) and (args.control or args.control_matrix):
+        argsd['case'] = args.case
+        argsd['case_matrix'] = args.case_matrix
+        argsd['control'] = args.control
+        argsd['control_matrix'] = args.control_matrix
+    else:
+        sys.exit('[ Error: Parameter is incomplete ! ]')
+    argsd['out_dir'] = args.out_dir
+    argsd['cutoff'] = args.cutoff
+    argsd['mode'] = args.mode
+    argsd['fp'] = args.fp
+    argsd['gene'] = args.gene
+    argsd['score'] = args.score
+    if args.gene and args.score:
+        print('[ Msg: Use the metrics that user set to calculate case-control. ]')
+        argsd['cc_default'] = False
+    elif not args.gene and not args.score:
+        argsd['cc_default'] = True
+        print('[ Msg: Use default method to calculate case-control. ]')
+    else:
+        print('[ Warn: Parameter is incomplete ! and use default method to calculate case-control. ]')
+        argsd['cc_default'] = True
+    argsd['config'] = args.config
+    return argsd
+
+
 def ana_args():
-    args_dict = {}
-    description = '=' * 77 + '\nVarTools 0.1.0 20210513\nWorkflow of WGS/WES trio analysis.\n' + '=' * 77
-    func = '''
-    function of VarTools:
+    description = '=' * 77 + '\nVarTools 0.1.0 20211011\nWorkflow of WGS/WES analysis.\n' + '=' * 77
+    print(description)
+    func_description = '''
+Usage:   VarTools.py <command> [options]
+function of VarTools:
     (1) f2v: analysis from fastq to gvcf. 
     (2) tGT: from gvcf created by GATK to vcf in trio mode.
     (3) sGT: from gvcf created by GATK to vcf in single mode.
@@ -36,158 +183,192 @@ def ana_args():
     (9) cc: case-control analysis with GRIPT.
     (10) bt: Burden testing with TRAPD.
     (11) bqc: bam quality check.
+    To get help on a particular command, call it with -h/--help.
     '''
-    print(description)
-    parser = argparse.ArgumentParser()
-    parser.description = description
-    parser.add_argument('function', help=func)
-    # common
-    parser.add_argument('-o', '--output', help='output directory of result, [./]')
-    parser.add_argument('-t', '--thread', help='thread of component softwares, [6]')
-    parser.add_argument('-b', '--bed', help='for WES/Panel region, include f2v,')
-    # f2v
-    parser.add_argument('-i', '--indir', help='directory of single sample raw data')
-    parser.add_argument('--vcf', action="store_true", help='Whether to generate vcf file.')
-    parser.add_argument('--qualimap', action="store_true",
-                        help='bamQC with qualimap. but maybe it is slowly with large bam.')
-    parser.add_argument('--fast_mark_dup', action='store_true',
-                        help='use sambamba to mark duplication, but when bam was very big, may get something wrong')
-    # bam qc
-    parser.add_argument('--bam', help='bam file for qc. (after sort and index)')
-    # tGT && sGT
-    parser.add_argument('-p', '--proband', help='directory of proband raw data')
-    parser.add_argument('-f', '--father', help='directory of father raw data')
-    parser.add_argument('-m', '--mother', help='directory of mother raw data')
-    parser.add_argument('-s', '--sibling', help='directory of siblings raw data, more one use \',\' split')
-    # trio
-    # parser.add_argument('-v', '--vcf', help='vcf file')
-    # parser.add_argument('-p', '--proband', help='sample name of proband in vcf')
-    # parser.add_argument('-f', '--father', help='directory of father raw data')
-    # parser.add_argument('-m', '--mother', help='directory of mother raw data')
-    # parser.add_argument('-s', '--sibling', help='directory of siblings raw data, more one use \',\' split')
-    # case-control
-    parser.add_argument('--case', help='input directory of case')
-    parser.add_argument('--control', help='input directory of control')
-    parser.add_argument('--case_matrix', help='matrix of case create by this program')
-    parser.add_argument('--control_matrix', help='matrix of control create by this program')
-    parser.add_argument('--cutoff', default=0, type=float, help='variant score cutoff. [0]')
-    parser.add_argument('--mode', default='AD', help='mode of disease, AD/AR, [AD]')
-    parser.add_argument('--snvdb', help='the false positive database that filted')
-    parser.add_argument('--gene', help='the columns name of gene in file')
-    parser.add_argument('--score', help='the columns name of metrics score in file')
-    # build false positive data base
-    parser.add_argument('--file_type', default='vcf', help='file type of input files, vcf/avinput. [vcf]')
-    parser.add_argument('--overlap_rate', default=0.5, type=float,
-                        help='overlap rate of variants to build false positive database, [0.5]')
-    args = parser.parse_args()
-    # thread
-    if not args.thread:
-        args_dict['thread'] = 8
-    else:
-        try:
-            thread = int(args.thread)
-            args_dict['thread'] = thread
-        except:
-            sys.exit('[ E: Please input integer in thread ! ]')
-    # 脚本所在路径
-    args_dict['scriptPath'] = os.path.split(os.path.realpath(__file__))[0]
-    # 输出目录，会重新创建一个
-    if not args.output:
-        args_dict['outPath'] = './'
-    else:
-        args_dict['outPath'] = args.output
-    # bed
-    if not args.bed:
-        args_dict['bed'] = False
-    else:
-        args_dict['bed'] = args.bed
-    #
-    args_dict['qualimap'] = args.qualimap
-    # 输入 & fun
-    args_dict['fun'] = args.function
-    if args_dict['fun'] == 'f2v':
-        if not args.indir:
-            sys.exit('[ E: Parameter is incomplete ! ]')
-        else:
-            args_dict['inDir'] = args.indir
-        args_dict['vcf'] = args.vcf
-        args_dict['fast_mark_dup'] = args.fast_mark_dup
-    elif args_dict['fun'] == 'tGT':
-        if args.proband and args.father and args.mother:
-            args_dict['pgVCF'] = os.path.realpath(args.proband)
-            args_dict['fgVCF'] = os.path.realpath(args.father)
-            args_dict['mgVCF'] = os.path.realpath(args.mother)
-            if args.sibling:
-                siblings = args.sibling
-                args_dict['sgVCF'] = [os.path.realpath(_.strip(' ')) for _ in siblings.split(',')]
-                print('[ M: find %d sibling. ]' % len(args_dict['sgVCF']))
-        else:
-            sys.exit('[ E: trio sample incomplete ! ]')
-    elif args_dict['fun'] == 'sGT':
-        args_dict['pgVCF'] = os.path.realpath(args.proband)
-    elif args_dict['fun'] == 'cc':
-        if (args.case or args.case_matrix) and (args.control or args.control_matrix):
-            args_dict['case'] = args.case
-            args_dict['case_matrix'] = args.case_matrix
-            args_dict['control'] = args.control
-            args_dict['control_matrix'] = args.control_matrix
-        else:
-            sys.exit('[ E: Parameter is incomplete ! ]')
-        args_dict['cutoff'] = args.cutoff
-        args_dict['mode'] = args.mode
-        args_dict['snvdb'] = args.snvdb
-        args_dict['gene'] = args.gene
-        args_dict['score'] = args.score
-        if args.gene and args.score:
-            print('[ M: Use the metrics that user set to calculate case-control. ]')
-            args_dict['cc_default'] = False
-        elif not args.gene and not args.score:
-            args_dict['cc_default'] = True
-            print('[ M: Use default method to calculate case-control. ]')
-        else:
-            print('[ W: Parameter is incomplete ! and use default method to calculate case-control. ]')
-            args_dict['cc_default'] = True
-    elif args_dict['fun'] == 'fp':
-        args_dict['file_type'] = args.file_type
-        args_dict['overlap_rate'] = args.overlap_rate
-    elif args_dict['fun'] == 'bqc':
-        args_dict['bam'] = args.bam
-    else:
-        sys.exit('[ Err: can not identify the function of <%s>]' % args_dict['fun'])
+    function = {
+        'f2v': 'analysis from fastq to gvcf.',
+        'tGT': 'from gvcf created by GATK to vcf in trio mode.',
+        'sGT': 'from gvcf created by GATK to vcf in single mode.',
+        'bqc': 'bam quality check.',
+        'fp': 'create false positive database from vcf files or avinput files.',
+        'cc': 'case-control analysis with GRIPT.',
+        'bt': 'Burden testing with TRAPD.',
+        'tSV': 'call trio SV with clinSV (only for WGS).',
+        'sSV': 'call single SV with clinSV (only for WGS).',
+        'sA': 'single case analysis.',
+        'tA': 'trio analysis.',
+    }
 
+    if len(sys.argv) == 1 or sys.argv[1] in ['--help', 'help', '-h']:
+        sys.exit(func_description)
+    elif sys.argv[1] == 'f2v':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s f2v [options] -i INDIR')
+        parser.description = function['f2v']
+        parser.add_argument('f2v')
+        parser.add_argument('-i', '--in_dir', help='directory of single sample raw data.')
+        parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
+        parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
+        parser.add_argument('-p', '--prefix', default=False,
+                            help='prefix of output file, if not, will use input directory name.')
+        parser.add_argument('--vcf', action="store_true", help='Whether to generate vcf file.')
+        parser.add_argument('--fastqc', action="store_true",
+                            help='in default, fastp will give reports, '
+                                 'set it if you want fastqc to check fastq with raw/clean data.')
+        parser.add_argument('--qualimap', action="store_true",
+                            help='bamQC with qualimap. but maybe it is slowly with large bam.')
+        parser.add_argument('--fast_mark_dup', action='store_true',
+                            help='use sambamba to mark duplication, but when bam is very big, may get something wrong.')
+        parser.add_argument('--rm_dup', action='store_true',
+                            help='remove duplication rather than mark.')
+        parser.add_argument('--fast_rm_dup', action='store_true',
+                            help='use fastp to remove duplication, and will skip mark duplication in follow-up steps. '
+                                 'if --fast_rm_dup option is enabled, '
+                                 'then --fast_mark_dup and --rm_dup options are ignored.')
+        parser.add_argument('--tmp_dir', default=False,
+                            help='temp directory, if not, it will create in the result directory.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        args = parser.parse_args()
+        args_dict = f2v_args(args)
+    elif sys.argv[1] == 'bqc':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s bqc [options] -b in.bam --bed bed')
+        parser.description = function['bqc']
+        parser.add_argument('bqc')
+        parser.add_argument('-b', '--bam', help='bam file for qc. (after sort and index).')
+        parser.add_argument('--bed', default=False,
+                            help='regions of interest. If WGS file, can use bed in \'lib\' or set by your self.')
+        parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
+        parser.add_argument('--qualimap', action="store_true",
+                            help='bamQC with qualimap. but maybe it is slowly with large bam.')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('--tmp_dir', default=False,
+                            help='temp directory, if not, it will create in the result directory.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        args = parser.parse_args()
+        args_dict = bqc_args(args)
+    elif sys.argv[1] == 'tGT':
+        parser = argparse.ArgumentParser(prog='VarTool.py',
+                                         usage='%(prog)s tGT [options] -p g.vcf.gz -f g.vcf.gz -m g.vcf.gz')
+        parser.description = function['tGT']
+        parser.add_argument('tGT')
+        parser.add_argument('-p', '--proband', help='g.vcf of proband.')
+        parser.add_argument('-f', '--father', help='g.vcf of father.')
+        parser.add_argument('-m', '--mother', help='g.vcf of mother.')
+        parser.add_argument('-s', '--sibling', help='g.vcf of siblings, more than one use \',\' to split.')
+        parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
+        parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
+        parser.add_argument('--prefix', default=False,
+                            help='prefix of output file.[].')
+        parser.add_argument('--tmp_dir', default=False,
+                            help='temp directory, if not, it will create in the result directory.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        args = parser.parse_args()
+        args_dict = tGT_args(args)
+    elif sys.argv[1] == 'sGT':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s sGT [options] -g g.vcf.gz')
+        parser.description = function['sGT']
+        parser.add_argument('sGT')
+        parser.add_argument('-g', '--gvcf', help='directory of proband raw data.')
+        parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
+        parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
+        parser.add_argument('--prefix', default='', help='prefix of output file.[].')
+        parser.add_argument('--tmp_dir', default=False,
+                            help='temp directory, if not, it will create in the result directory.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        args = parser.parse_args()
+        args_dict = sGT_args(args)
+    elif sys.argv[1] == 'fp':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s fp [options] -i INDIR')
+        parser.description = function['fp']
+        parser.add_argument('fp')
+        parser.add_argument('-i', '--in_dir', help='directory of single sample raw data.')
+        parser.add_argument('-o', '--outfile', default='fp.txt',
+                            help='out file of result, if exist, will add result to end, [fp.txt].')
+        parser.add_argument('--file_type', default='vcf',
+                            help='file type , vcf/region. region:chr,start,end,ref,alt, 1-based, split by tab. [vcf].')
+        parser.add_argument('--overlap_rate', default=0.5, type=float,
+                            help='overlap rate of variants to build false positive database, [0.5].')
+        parser.add_argument('--tmp_dir', default='./.tmp_dir_for_fp', help='temp directory [./.tmp_dir_for_fp].')
+        args = parser.parse_args()
+        args_dict = fp_args(args)
+    elif sys.argv[1] == 'cc':
+        parser = argparse.ArgumentParser(prog='VarTool.py',
+                                         usage='%(prog)s cc [options] -c/-m case.dir/case.matrix '
+                                               '-C/-M control.dir/control.matrix')
+        parser.description = function['cc']
+        parser.add_argument('cc')
+        parser.add_argument('-c', '--case', help='input directory of case.')
+        parser.add_argument('-C', '--control', help='input directory of control.')
+        parser.add_argument('-m', '--case_matrix', help='matrix of case create by this program.')
+        parser.add_argument('-M', '--control_matrix', help='matrix of control create by this program.')
+        parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
+        parser.add_argument('-t', '--cutoff', default=0, type=float, help='variant score cutoff, [0].')
+        parser.add_argument('--mode', default='AD', help='mode of disease, AD/AR, [AD].')
+        parser.add_argument('--fp', help='the false positive database that filted.')
+        parser.add_argument('--gene', help='the columns name of gene in file.')
+        parser.add_argument('--score', help='the columns name of metrics score in file.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        args = parser.parse_args()
+        args_dict = cc_args(args)
+    else:
+        sys.exit('[ Error: Can not identify the function of <%s>]' % sys.argv[1])
+
+    # 脚本所在路径
+    args_dict['fun'] = sys.argv[1]
+    args_dict['script_path'] = os.path.split(os.path.realpath(__file__))[0]
     return args_dict
 
 
 def main():
-    start_time = time.perf_counter()
-    end_words = '=' * 77 + '\nThanks for using VarTools! \nReport bugs to tongshiyuan@foxmail.com\n' + '=' * 77
     # 设置参数
     args = ana_args()
     if args['fun'] == 'f2v':
-        f2v(args['inDir'], args['outPath'], args['thread'], args['scriptPath'], args['vcf'], args['qualimap'],
-            args['bed'], args['fast_mark_dup'])
+        f2v(args['in_dir'], args['out_dir'], args['bed'], args['prefix'],
+            args['vcf'], args['fastqc'], args['qualimap'],
+            args['fast_mark_dup'], args['rm_dup'], args['fast_rm_dup'],
+            args['thread'], args['script_path'], args['config'], args['tmp_dir'], args['keep_tmp'])
+
+    elif args['fun'] == 'bqc':
+        bamQC(args['bam'], args['bed'], args['out_dir'], args['tmp_dir'],
+              args['script_path'], args['thread'], args['qualimap'], args['keep_tmp'])
+
     elif args['fun'] == 'tGT':
-        trio_gt(args['pgVCF'], args['fgVCF'], args['mgVCF'], args['sgVCF'], args['outPath'], args['scriptPath'])
+        trio_gt(args['p_gvcf'], args['f_gvcf'], args['m_gvcf'], args['s_gvcfs'],
+                args['out_dir'], args['script_path'], args['config'],
+                args['keep_tmp'], args['tmp_dir'], args['bed'], args['prefix'])
+
     elif args['fun'] == 'sGT':
-        single_gt(args['pgVCF'], args['outPath'], args['scriptPath'])
+        single_gt(args['gvcf'], args['out_dir'], args['script_path'], args['bed'], args['tmp_dir'], args['keep_tmp'],
+                  args['prefix'], args['config'])
+
+    elif args['fun'] == 'fp':
+        rm_tmp = False
+        if not os.path.isdir(args['tmp_dir']):
+            rm_tmp = True
+            os.makedirs(args['tmp_dir'])
+        tmp_dir = os.path.abspath(args['tmp_dir'])
+        build_snvdb(args['in_dir'], args['outfile'], tmp_dir,
+                    args['script_path'], args['file_type'], args['overlap_rate'], rm_tmp)
+
+    elif args['fun'] == 'cc':
+        burden_test(args['case'], args['control'], args['case_matrix'], args['control_matrix'],
+                    args['out_dir'], args['fp'], args['mode'], args['cutoff'],
+                    args['cc_default'], args['gene'], args['score'], args['script_path'], args['config'])
+
     elif args['fun'] == 'tA':
         pass
     elif args['fun'] == 'sA':
         pass
-    elif args['fun'] == 'cc':
-        burden_test(args['case'], args['control'], args['case_matrix'], args['control_matrix'],
-                    args['outPath'], args['snvdb'], args['mode'], args['cutoff'],
-                    args['cc_default'], args['gene'], args['score'], args['scriptPath'])
-    elif args['fun'] == 'fp':
-        build_snvdb(args['inDir'], args['outPath'], args['snvdb'],
-                    args['scriptPath'], args['file_type'], args['overlap_rate'],
-                    )
-    elif args['fun'] == 'bqc':
-        bamQC(args['bam'], args['bed'], args['outPath'], args['scriptPath'], args['thread'], args['qualimap'])
-    end_time = time.perf_counter()
-    print('[ Msg: Use time : <%d> s]' % (end_time - start_time))
-    print(end_words)
 
 
 if __name__ == '__main__':
+    start_time = time.perf_counter()
     main()
+    end_words = '=' * 77 + '\nThanks for using VarTools! \nYou can report bugs to tongshiyuan@foxmail.com\n' + '=' * 77
+    end_time = time.perf_counter()
+    tim = format_time(end_time - start_time)
+    print('[ Msg: Use time : %s ]' % tim)
+    print(end_words)

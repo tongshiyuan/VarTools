@@ -1,13 +1,12 @@
 import re
 import os
 import sys
-
 import numpy as np
 import pandas as pd
 import scipy.stats as st
 
 
-def Z_binomial(n1, n2, N1, N2):
+def z_binomial(n1, n2, N1, N2):
     r = N2 / N1
     n = n1 / (n1 + n2) - 1 / (1 + r)
     d = (r / ((1 + r) * (1 + r) * (n1 + n2))) ** 0.5
@@ -24,8 +23,8 @@ def gene_rank(s1, s2, N1, N2):
     n1, n2 = len(s1), len(s2)
     if s2 == [0]:
         n2 = 0
-    Z1 = Z_binomial(n1, n2, N1, N2)
-    p1 = st.norm.logsf(Z1)
+    z1 = z_binomial(n1, n2, N1, N2)
+    p1 = st.norm.logsf(z1)
     _, p2 = st.mannwhitneyu(s1, s2,
                             method='asymptotic',
                             alternative='greater')
@@ -250,20 +249,20 @@ def filter_score(file, outdir, config, mode, ctlf=''):
     outfile.close()
 
 
-def build_snvdb(file_path, out_dir, out_file_name, script_path, file_type='vcf', rate=0.5):
+def build_snvdb(file_path, out_file_name, out_dir, script_path, file_type, rate, rm_tmp):
     total_var_dict = {}
     # 获得输入目录中的vcf文件
     file_names = []
     if file_type in ['vcf', 'VCF', 'Vcf']:
         for file in os.listdir(file_path):
-            if re.findall(r'(\.vcf\.gz|\.vcf)$', file):
+            if re.findall(r'(\.vcf\.gz|\.vcf)$', file) and not file.startswith('.'):
                 file_names.append(file)
-    elif file_type in ['avinput']:
+    elif file_type in ['region']:
         for file in os.listdir(file_path):
             if not file.startswith('.'):
                 file_names.append(file)
     if len(file_names) < 1:
-        sys.exit('[ E: lack input vcf file ！]')
+        sys.exit('[ Error: lack input vcf file ！]')
     # 获得记录及出现次数
     if file_type in ['vcf', 'VCF', 'Vcf']:
         num = 0
@@ -275,7 +274,7 @@ def build_snvdb(file_path, out_dir, out_file_name, script_path, file_type='vcf',
             result = os.system(tran_file_cmd)
             if result:
                 print(
-                    '[ E: Something wrong with change format with input vcf file < %s > ！remove from program !]' % file)
+                    '[ Error: Something wrong with change format with vcf file < %s > ！remove from program !]' % file)
             else:
                 tmp_file_names = []
                 for _file in os.listdir(out_dir):
@@ -291,20 +290,15 @@ def build_snvdb(file_path, out_dir, out_file_name, script_path, file_type='vcf',
                                 total_var_dict[key] = total_var_dict.get(key, 0) + 1
                             elif records[5].startswith('hom'):
                                 total_var_dict[key] = total_var_dict.get(key, 0) + 2
-            clear_tmp_cmd = 'rm -rf %s/* ' % out_dir
+            clear_tmp_cmd = 'rm -rf %s* ' % tmp_out
             os.system(clear_tmp_cmd)
-        out_file = open('./' + out_file_name, 'a+')
+        out_file = open(out_file_name, 'a+')
         for k, v in total_var_dict.items():
             if v / num >= rate:
                 out_file.write(k + '\n')
         out_file.close()
-        clear_tmp_cmd = 'rm -rf %s ' % out_dir
-        result = os.system(clear_tmp_cmd)
-        if result:
-            sys.exit('[ E: Something wrong with clear temp file ！]')
-        else:
-            print('[ S: False positive database build successfully ！]')
-    elif file_type in ['avinput']:
+        print('[ Msg: Identify %d samples' % num)
+    elif file_type in ['region']:
         num = len(file_names)
         for file in file_names:
             file_name = file_path + '/' + file
@@ -312,12 +306,28 @@ def build_snvdb(file_path, out_dir, out_file_name, script_path, file_type='vcf',
                 for line in f:
                     key = '\t'.join(line.strip().split('\t')[:5]).lstrip('chr')
                     total_var_dict[key] = total_var_dict.get(key, 0) + 1
-        out_file = open('./' + out_file_name, 'a+')
+        out_file = open(out_file_name, 'a+')
         for k, v in total_var_dict.items():
             if v / num >= rate:
                 out_file.write(k + '\n')
         out_file.close()
-        print('[ S: False positive database build successfully ！]')
+        print('[ Msg: Identify %d samples' % num)
+        print('[ Msg: False positive database build successfully ！]')
+    # uniq
+    uniq_cmd = 'sort %s | uniq > %s && mv %s %s' % (
+        out_file_name, out_dir + '/fp.uniq.txt', out_dir + '/fp.uniq.txt', out_file_name)
+    result = os.system(uniq_cmd)
+    if result:
+        sys.exit('[ Error: Something wrong with uniq false positive database ！]')
+    else:
+        print('[ Msg: Uniq false positive database done ！]')
+    if rm_tmp:
+        clear_tmp_cmd = 'rmdir %s' % out_dir
+        result = os.system(clear_tmp_cmd)
+        if result:
+            sys.exit('[ Error: Something wrong with clear temp file ！]')
+        else:
+            print('[ Msg: False positive database build successfully ！]')
 
 
 def rm_snvdb(file, snvdb):
