@@ -67,7 +67,7 @@ def f2v_args(args):
     argsd['tmp_dir'] = args.tmp_dir
     argsd['keep_tmp'] = args.keep_tmp
     argsd['config'] = args.config
-    argsd['gender_rate'] = args.rate
+    argsd['gender_rate'] = args.gender_rate
     return argsd
 
 
@@ -84,7 +84,7 @@ def bqc_args(args):
     argsd['thread'] = args.thread
     argsd['tmp_dir'] = args.tmp_dir
     argsd['keep_tmp'] = args.keep_tmp
-    argsd['gender_rate'] = args.rate
+    argsd['gender_rate'] = args.gender_rate
     return argsd
 
 

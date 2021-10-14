@@ -10,9 +10,7 @@ from script.filter import frequency_filter
 # 模块4：针对snvs和indels的所有的注释
 # 模块5：针对SVs的注释
 
-def trio_short_variants_filter(vcf,
-                               outDir,
-                               scriptPath,
+def trio_short_variants_filter(vcf, prefix, out_dir, script_path,
                                AFDb,
                                AFType,
                                geneDb,
@@ -24,12 +22,11 @@ def trio_short_variants_filter(vcf,
                                ref_version,
                                thread):
     # vcf -> avinput
-    avinput, gt = short_variants_transfer_format(vcf, outDir, scriptPath)
-    afAnno, num = anno_frequency(avinput, gt, outDir, AFDb, AFType, annoDir, thread, ref_version, scriptPath)
-    afFilted = outDir + '/AF_filted.txt'
+    avinput, info = short_variants_convert_format(vcf, prefix, out_dir, script_path)
+    afAnno, num = anno_frequency(avinput, info, out_dir, AFDb, AFType, annoDir, thread, ref_version, script_path)
+    afFilted = out_dir + '/AF_filted.txt'
     frequency_filter(afAnno, afFilted, AFlist, afThreshold)
-    geneAnno, num = anno_gene(afFilted, outDir, num, geneDb, geneType, annoDir, thread, ref_version, scriptPath)
-
+    geneAnno, num = anno_gene(afFilted, out_dir, num, geneDb, geneType, annoDir, thread, ref_version, script_path)
 
 
 def single_short_variants_filter(vcf):
@@ -44,31 +41,38 @@ def single_structure_variants_filter(vcf):
     pass
 
 
-def short_variants_transfer_format(vcf, outDir, scriptPath):
+def short_variants_convert_format(vcf, prefix, out_dir, script_path):
     """paste input1.anno.vcf genotype > input.anno.vcf"""
     # out_dir = out_dir.rstrip('/') + '/'
     # file_name = os.path.basename(vcf_file).split('.vcf')[0]
-    avinput = outDir + '/cohort.avinput'
-    gt_file_tmp = outDir + '/cohort.gt_tmp'
-    gt_file = outDir + '/cohort.gt'
+    avinput = '%s/%s_annovar.avinput' % (out_dir, prefix)
+    info_tmp_file = '%s/%s_tmp.info' % (out_dir, prefix)
+    info_file = '%s/%s_sample.info' % (out_dir, prefix)
+    head_file = '%s/%s_head.txt' % (out_dir, prefix)
     # 转换格式的时候保留vcf信息
-    transCmd = 'perl %s/bin/annovar/convert2annovar.pl -format vcf4 %s -outfile %s -includeinfo -allsample -withfreq' \
-               % (scriptPath, vcf, avinput)
-    execute_system(transCmd, '[ Msg: Transfer format done ! ]', '[ E: Something wrong with transfer format ! ]')
+    cv_cmd = 'perl %s/bin/annovar/convert2annovar.pl -format vcf4 %s -outfile %s -includeinfo -allsample -withfreq' % (
+        script_path, vcf, avinput)
+    execute_system(cv_cmd, '[ Msg: Transfer format done ! ]', '[ Error: Something wrong with transfer format ! ]')
     # 截取前五列以后的信息
-    get_genotype = 'cut -f 14- %s > %s' % (avinput, gt_file_tmp)
-    execute_system(get_genotype, '[ Msg: Get genotype done ! ]', '[ E: Something wrong with get genotype ! ]')
+    get_info_cmd = 'cut -f 6- %s > %s' % (avinput, info_tmp_file)
+    execute_system(get_info_cmd, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
     # 截取头信息
-    head = open(outDir + '/cohort.head.txt', 'w')
-    with gzip.open(vcf, 'rb') as f:
-        for i in f:
-            if i.startswith('#CHROM'):
-                head.write(i.split('\tALT\t')[1])
-                break
+    head = open(head_file, 'w')
+    if vcf.endswith('vcf.gz'):
+        with gzip.open(vcf, 'rb') as f:
+            for i in f:
+                if i.decode().startswith('#CHROM'):
+                    head.write(i.split('\tALT\t')[1])
+                    break
+    else:
+        with open(vcf) as f:
+            for i in f:
+                if i.startswith('#CHROM'):
+                    head.write(i.split('\tALT\t')[1])
+                    break
     head.close()
-    os.system('cat %s %s > %s' % (outDir + '/cohort.head.txt', gt_file_tmp, gt_file))
-
-    return avinput, gt_file
+    os.system('cat %s %s > %s' % (head_file, info_tmp_file, info_file))
+    return avinput, info_file
 
 
 def anno_frequency(avinput, gt, out_dir, db_list, type_list, anno_dir, thread, ver, scriptPath):
