@@ -224,7 +224,7 @@ function of VarTools:
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s f2v [options] -i INDIR')
         parser.description = function['f2v']
         parser.add_argument('f2v')
-        parser.add_argument('-i', '--in_dir', help='directory of single sample raw data.')
+        parser.add_argument('-i', '--in_dir', required=True, help='directory of single sample raw data.')
         parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
         parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
         parser.add_argument('-p', '--prefix', default=False,
@@ -256,8 +256,8 @@ function of VarTools:
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s bqc [options] -b in.bam --bed bed')
         parser.description = function['bqc']
         parser.add_argument('bqc')
-        parser.add_argument('-b', '--bam', help='bam file for qc. (after sort and index).')
-        parser.add_argument('--bed', default=False,
+        parser.add_argument('-b', '--bam', required=True, help='bam file for qc. (after sort and index).')
+        parser.add_argument('--bed', required=True,
                             help='regions of interest. If WGS file, can use bed in \'lib\' or set by your self.')
         parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
         parser.add_argument('--qualimap', action="store_true",
@@ -275,9 +275,9 @@ function of VarTools:
                                          usage='%(prog)s tGT [options] -p g.vcf.gz -f g.vcf.gz -m g.vcf.gz')
         parser.description = function['tGT']
         parser.add_argument('tGT')
-        parser.add_argument('-p', '--proband', help='g.vcf of proband.')
-        parser.add_argument('-f', '--father', help='g.vcf of father.')
-        parser.add_argument('-m', '--mother', help='g.vcf of mother.')
+        parser.add_argument('-p', '--proband', required=True, help='g.vcf of proband.')
+        parser.add_argument('-f', '--father', required=True, help='g.vcf of father.')
+        parser.add_argument('-m', '--mother', required=True, help='g.vcf of mother.')
         parser.add_argument('-s', '--sibling', help='g.vcf of siblings, more than one use \',\' to split.')
         parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
         parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
@@ -293,7 +293,7 @@ function of VarTools:
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s sGT [options] -g g.vcf.gz')
         parser.description = function['sGT']
         parser.add_argument('sGT')
-        parser.add_argument('-g', '--gvcf', help='directory of proband raw data.')
+        parser.add_argument('-g', '--gvcf', required=True, help='directory of proband raw data.')
         parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
         parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
         parser.add_argument('--prefix', default='', help='prefix of output file.[].')
@@ -307,7 +307,7 @@ function of VarTools:
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s fp [options] -i INDIR')
         parser.description = function['fp']
         parser.add_argument('fp')
-        parser.add_argument('-i', '--in_dir', help='directory of single sample raw data.')
+        parser.add_argument('-i', '--in_dir', required=True, help='directory of single sample raw data.')
         parser.add_argument('-o', '--outfile', default='fp.txt',
                             help='out file of result, if exist, will add result to end, [fp.txt].')
         parser.add_argument('--file_type', default='vcf',
@@ -340,8 +340,8 @@ function of VarTools:
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s gd [options] -b bam -d bed')
         parser.description = function['gd']
         parser.add_argument('gd')
-        parser.add_argument('-b', '--bam', help='bam file for gender identify. (after sort and index).')
-        parser.add_argument('-d', '--bed', default=False,
+        parser.add_argument('-b', '--bam', required=True, help='bam file for gender identify. (after sort and index).')
+        parser.add_argument('-d', '--bed', required=True,
                             help='regions of interest. If WGS file, can use bed in \'lib\' or set by your self.')
         parser.add_argument('--tmp_dir', default='./.tmp_dir_for_gd', help='temp directory [./.tmp_dir_for_gd].')
         parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')

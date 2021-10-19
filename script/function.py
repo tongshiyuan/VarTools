@@ -116,7 +116,6 @@ def f2v(in_dir, out_dir, bed, prefix,
             os.makedirs(vcf_rep_dir)
             vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
                                         script_path, bed, keep_tmp)
-            gender_determined(vcf_file)
     else:
         print(['[ Msg: Now software only calling by gatk. ]'])
         gvcf = gatk_pre(bam_file, rst_out_dir, tmp_dir,
@@ -126,7 +125,6 @@ def f2v(in_dir, out_dir, bed, prefix,
             os.makedirs(vcf_rep_dir)
             vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
                                         script_path, bed, keep_tmp)
-            gender_determined(vcf_file)
 
 
 def bamQC(bam, bed, out_dir, tmp_dir, script_path, thread, bq, keep_tmp, gender_rate):

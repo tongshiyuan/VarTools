@@ -59,7 +59,6 @@ def align(fq1, fq2, out_dir, prefix, reference, software, thread, script_path, p
 def bwa_mem2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path, platform, tmp_prefix):
     # 检查索引文件
     out_bam = '%s/%s.sorted.bam' % (out_dir, prefix)
-    file_name = os.path.basename(fq1).split('1')[0]
     suffix_list = ['.0123', '.amb', '.ann', '.bwt.2bit.64', '.bwt.8bit.32', '.pac']
     for suffix in suffix_list:
         if not os.path.exists(reference + suffix):
@@ -74,8 +73,8 @@ def bwa_mem2(fq1, fq2, out_dir, prefix, reference, thread, _id, _lb, script_path
                             r'"@RG\tID:%s\tPL:%s\tLB:%s\tSM:%s" %s %s %s | ' \
                             r'samtools sort -@ %d -T %s -m 4G - > %s' % (
                   thread, _id, platform, _lb, prefix, reference, fq1, fq2, thread, tmp_prefix, out_bam)
-    execute_system(map_cmd, '[ Msg: <%s> mapping and sort done ! ]' % file_name,
-                   '[ Error: <%s> fail to mapping with bwa-mem2 or sort bam file ! ]' % file_name)
+    execute_system(map_cmd, '[ Msg: <%s> mapping and sort done ! ]' % prefix,
+                   '[ Error: <%s> fail to mapping with bwa-mem2 or sort bam file ! ]' % prefix)
     return out_bam
 
 
@@ -235,7 +234,8 @@ def single_bam_qc(bam, bed_file, tmp_dir, report_dir, new_target_file, script_pa
         print('[ Error: Something wrong with bam stat depth ! ]')
     else:
         print('[ Msg: bam stat depth done ! ]')
-        gender = gender_determined(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz', gender_rate)
+        gender = gender_determined(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz',
+                                   gender_rate)
         result_dict['gender'] = gender
         data = pd.read_table(tmp_dir + '/' + bam.split('/')[-1].rstrip('.bam') + '.thresholds.bed.gz',
                              low_memory=False,
