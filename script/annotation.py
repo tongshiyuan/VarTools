@@ -4,11 +4,6 @@ from script.common import execute_system, get_row_num
 from script.filter import frequency_filter
 
 
-# 模块1：对vcf文件的格式转换
-# 模块2：针对snvs和indels的频率注释
-# 模块3：针对snvs和indels的有害性noncoding位点注释
-# 模块4：针对snvs和indels的所有的注释
-# 模块5：针对SVs的注释
 def short_variants_convert_format(vcf, prefix, out_dir, script_path):
     avinput = '%s/%s_annovar.avinput' % (out_dir, prefix)
     info_tmp_file = '%s/%s_tmp.info' % (out_dir, prefix)
@@ -48,26 +43,25 @@ def short_variants_step_anno():
     pass
 
 
-def anno_frequency(avinput, gt, out_dir, db_list, type_list, anno_dir, thread, ver, script_path):
+def anno_frequency(avinput, info, out_dir, prefix, db_list, type_list, anno_dir, ver, script_path, thread):
     # 注释
-    fileName = os.path.basename(avinput).split('.')[0]
-    file_out = out_dir.rstrip('/') + '/' + fileName
-    annoCmd = 'perl %s/bin/table_annovar.pl %s %s --buildver %s -out %s -remove -protocol %s -operation %s -nastring ' \
-              '. --thread %d > /dev/null 2>&1' % (
-                  script_path, avinput, anno_dir, ver, file_out, db_list, type_list, thread)
-    execute_system(annoCmd, '[ Msg: <%s> frequency annotation done ! ]' % fileName,
-                   '[ E: Something wrong with <%s> frequency annotation ! ]' % fileName)
+    file_out = out_dir + '/' + prefix
+    anno_cmd = 'perl %s/bin/annovar/table_annovar.pl %s %s --buildver %s -out %s -remove ' \
+               '-protocol %s -operation %s -nastring . --thread %d > /dev/null 2>&1' % (
+                   script_path, avinput, anno_dir, ver, file_out, db_list, type_list, thread)
+    execute_system(anno_cmd, '[ Msg: <%s> frequency annotation done ! ]' % prefix,
+                   '[ Error: Something wrong with <%s> frequency annotation ! ]' % prefix)
     # 合并
-    tmp_result = file_out + '.hg19_multianno.txt'
+    tmp_result = '%s.%s_multianno.txt' % (file_out, ver)
     result = file_out + '.freq_anno'
-    paste_cmd = 'paste %s %s > %s' % (tmp_result, gt, result)
-    execute_system(paste_cmd, '[ Msg: <%s> frequency annotation and genotype paste done ! ]' % fileName,
-                   '[ E: Something wrong with <%s> paste frequency annotation and genotype ! ]' % fileName)
+    paste_cmd = 'paste %s %s > %s' % (tmp_result, info, result)
+    execute_system(paste_cmd, '[ Msg: <%s> frequency annotation and genotype paste done ! ]' % prefix,
+                   '[ Error: Something wrong with <%s> paste frequency annotation and genotype ! ]' % prefix)
     # 获得列数
-    header = file_out + '.hg19_multianno.header'
+    header = '%s.%s_multianno.header' % (file_out, ver)
     num = get_row_num(tmp_result, header)
 
-    return result, num
+    return result, num + 1
 
 
 def anno_gene(infile, out_dir, num, geneList, geneType, anno_dir, thread, ver, scriptPath):
@@ -124,15 +118,43 @@ def anno_all(infile, out_dir, db_list, type_list, anno_dir, anno_thread=12, ver=
     return result
 
 
-def trio_short_variants_filter(vcf, prefix, out_dir, script_path,
-                               AF_db, AF_type, AF_list, af_threshold,
-                               geneDb, geneType, clin_list,
-                               anno_dir, ref_version, thread):
+def db_format(gene_db='', region_db='', af_db='', filter_db='', dd_db=''):
+    db_list = []
+    ty_list = []
+    if gene_db:
+        for i in gene_db.strip().strip(',').split(','):
+            db_list.append(i)
+            ty_list.append('g')
+    if region_db:
+        for i in region_db.strip().strip(',').split(','):
+            db_list.append(i)
+            ty_list.append('r')
+    if af_db:
+        for i in af_db.strip().strip(',').split(','):
+            db_list.append(i)
+            ty_list.append('f')
+    if filter_db:
+        for i in filter_db.strip().strip(',').split(','):
+            db_list.append(i)
+            ty_list.append('f')
+    if dd_db:
+        for i in dd_db.strip().strip(',').split(','):
+            db_list.append(i)
+            ty_list.append('f')
+    return db_list, ty_list
+
+
+def trio_short_variants_filter(vcf, prefix, out_dir,
+                               gene_db, region_db, af_db, filter_db, dd_db,
+                               af_list, af_th,
+                               anno_dir, ref_version, script_path, thread):
     # vcf -> avinput
     avinput, info = short_variants_convert_format(vcf, prefix, out_dir, script_path)
-    af_anno, num = anno_frequency(avinput, info, out_dir, AF_db, AF_type, anno_dir, thread, ref_version, script_path)
+    db_for_af, ty_for_af = db_format(af_db=af_db, dd_db=dd_db)
+    af_anno, num = anno_frequency(avinput, info, out_dir, prefix, db_for_af, ty_for_af, anno_dir, ref_version,
+                                  script_path, thread)
     af_filted = out_dir + '/AF_filted.txt'
-    frequency_filter(af_anno, af_filted, AF_list, af_threshold)
+    frequency_filter(af_anno, af_filted, af_list, af_th)
     geneAnno, num = anno_gene(af_filted, out_dir, num, geneDb, geneType, anno_dir, thread, ref_version, script_path)
 
 

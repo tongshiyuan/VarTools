@@ -125,12 +125,12 @@ def get_raw_info(fq1):
     return _lb, _id
 
 
-def get_row_num(tmp_result, header):
+def get_row_num(tmp_result, header, sep='\t'):
     num_cmd = 'head -n 1 %s > %s ' % (tmp_result, header)
     os.system(num_cmd)
     with open(header) as f:
-        num = len(f.readline().strip().split('\t'))
-    return num + 1
+        num = len(f.readline().rstrip('\n').split(sep))
+    return num
 
 
 def affinity(vcf, aff_dir, script_path):

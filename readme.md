@@ -79,10 +79,13 @@ python VarTools gd -b in.bam -d bed
 
 - [GATK](https://console.cloud.google.com/storage/browser/gcp-public-data--broad-references)
 - [Reference gap](https://hgdownload.cse.ucsc.edu/goldenPath/hg38/database/gap.txt.gz)
+- [SPIDEX 1.0 ](http://tools.genes.toronto.edu)
+- [omim](https://omim.org/)
+- [ReVe](http://159.226.67.237/sun/varcards/resource/download/hg19_ReVe.txt.gz)
 
 ### some files in `lib`
 
-- hg19.genome.bed
+- Hg19.genome.bed/Hg38.genome.bed
 
 ~~~(shell)
 # Hg38 from GATK
@@ -91,4 +94,12 @@ cut -f 1,2 Hg38.fasta.fai | head -n 24 | sort -k1,1  > Hg38.genome
 cut -f 1,2 Hg19.fasta.fai | sed -n '2,25p' | sort -k1,1  > Hg19.genome
 zcat gap.txt.gz | awk -F"\t" '{if ($2~/^.{4,5}$/) print $2"\t"$3"\t"$4 }' | bedtools sort -i stdin > gap.bed
 bedtools complement -i gap.bed -g Hg38.genome > Hg38.genome.bed
+~~~
+
+### some databases built
+
+- ReVe
+~~~shell
+zcat hg19_ReVe.txt.gz | cut -f 1-5,8 > hg19_ReVe_tmp1.txt
+perl index_annovar.pl hg19_ReVe_tmp1.txt -outfile hg19_ReVe.txt -comment comment.txt
 ~~~

@@ -3,11 +3,9 @@ import pandas as pd
 from script.common import execute_system
 
 
-def frequency_filter(infile, out_file, fredb_list, threshold):
+def frequency_filter(infile, out_file, fredb_list, threshold, retain_line):
     print('[ Msg: Start frequency filter, threshold: < %d > .]' % threshold)
     freq_index = []
-    # clin_index = []
-    # keys = []
     out_ = open(out_file, 'w')
     with open(infile) as f:
         line = f.readline()
@@ -16,22 +14,30 @@ def frequency_filter(infile, out_file, fredb_list, threshold):
             try:
                 freq_index.append(line.strip().split('\t').index(_db))
             except:
-                print('[ W: Can not find database <%s> in frequency filter ! ]' % _db)
+                print('[ Warn: Can not find database <%s> in frequency filter ! ]' % _db)
         if not freq_index:
-            sys.exit('[ E: Can not find allele frequency database in frequency filter ! ]')
-        # if clindb_dict:
-        #     for _db in clindb_dict.keys():
-        #         try:
-        #             clin_index.append(line.strip().split('\t').index(_db))
-        #             keys.append(_db)
-        #         except:
-        #             print('[ W: Can not find database <%s> in frequency filter ! ]' % _db)
-        # else:
-        #     print('[ W: Program have not reported database in frequency filter ! ]')
-        # if not clin_index:
+            sys.exit('[ Error: Can not find allele frequency database in frequency filter ! ]')
+        db_col, db_retain = [], []
+        if retain_line:
+            # retail_col1:retain_tag1|retain_tag2;retail_col2:retain_tag1|retain_tag2
+            for db_ln in retain_line.strip().rstrip(';').split(';'):
+                try:
+                    col = db_ln.strip().split(':')[0]
+                    col_idx = line.strip().split('\t').index(col)
+                    db_col.append(col_idx)
+                    db_retain.append(db_ln.strip().split(':')[1].strip().split('|'))
+                except:
+                    print('[ Warn: Something wrong with parsing retain expressions <%s> ! ]' % col)
+            if not db_col:
+                print('[ Warn: Program can not identify retain database in frequency filter ! ]')
         for line in f:
-            if line:
-                records = line.strip().split('\t')
+            records = line.strip().split('\t')
+            if db_col:
+                for idx, _ in enumerate(db_col):
+                    if records[_] in db_retain[idx]:
+                        out_.write(line)
+                        break
+
                 af_max = 0.00000000001
                 for af_index in freq_index:
                     if records[af_index] != '.' and eval(records[af_index]) >= af_max:
