@@ -1,6 +1,6 @@
 import os
 import sys
-from script.common import execute_system
+from script.common import execute_system, check_software
 
 
 # 输入是bam文件，
@@ -238,82 +238,121 @@ def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, scr
     return vcf
 
 
-def bcftools(infile, outdir, tmp_dir, report_dir, reference, sample_name, call_thread=12, zip_thread=12):
-    outdir = outdir.rstrip('/') + '/'
-    report_dir = report_dir.rstrip('/') + '/'
-    tmp_dir = tmp_dir + sample_name + '/bcftools/'
-    os.makedirs(tmp_dir)
-    _tmp_vcf1 = tmp_dir + sample_name + '.bcftools.raw.vcf'
-    _tmp_vcf2 = tmp_dir + sample_name + '.bcftools.flt.vcf'
-    _ziped_vcf = outdir + sample_name + '.bcftools.vcf.gz'
-    # call snvs/indels
-    call_cmd = 'bcftools mpileup --threads {} -q 20 -Q 20 -Ou -f {} {} | bcftools call --threads {} -mv -Ov | ' \
-               'bcftools filter --threads {} -s FILTER -g 10 -G 10 -i "%QUAL>20 && DP>6 && MQ>=40 && ' \
-               '(DP4[2]+DP4[3])>4" > {}'.format(call_thread, reference, infile, call_thread, call_thread, _tmp_vcf1)
-    execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by bcftools ! ]' % sample_name,
-                   '[ E: Something wrong with <%s> call snvs/indels by bcftools ! ]' % sample_name)
-    # filter variations
-    filt_cmd = r'''awk -F "\t" '{if($1~/#/){print}else if($7~/PASS/){print}}' %s > %s''' % (_tmp_vcf1, _tmp_vcf2)
-    execute_system(filt_cmd, '[ Msg: <%s> filter snvs/indels done in bcftools ! ]' % sample_name,
-                   '[ E: Something wrong with filter <%s> raw variations in bcftools ! ]' % sample_name)
-    # 合成前准备，包括合成列表文件，压缩，索引
-    # 压缩
-    zip_cmd = 'bgzip -c -f -@ %d %s > %s' % (zip_thread, _tmp_vcf2, _ziped_vcf)
-    execute_system(zip_cmd, '[ Msg: Bgzip <%s> vcf done in bcfrools ! ]' % sample_name,
-                   '[ E: Something wrong with bgzip <%s> vcf in bcftools ! ]' % sample_name)
-    # 建立索引
-    index_cmd = 'bcftools index -t %s' % _ziped_vcf
-    execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in bcftools ! ]' % sample_name,
-                   '[ E: Something wrong with build <%s> vcf index file in bcftools ! ]' % sample_name)
-    # 删除过程文件
-    rm_cmd = 'rm -f %s %s' % (_tmp_vcf1, _tmp_vcf2)
-    execute_system(rm_cmd, '[ Msg: Delete <%s> process file done in bcftools ! ]' % sample_name,
-                   '[ E: Something wrong with delete <%s> process file in bcftools ! ]' % sample_name)
-    # vcf stats
-    vcf_stats(_ziped_vcf, report_dir, sample_name, reference)
-    return _ziped_vcf
+def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir):
+    out_dir += '/strelka_workplace'
+    if bed:
+        compress_cmd = 'cp %s %s && %s/bin/bgzip %s/%s && %s/bin/tabix -b 2 -e 3 -p bed %s/%s.gz' % (
+            bed, tmp_dir, script_path, tmp_dir, bed, script_path, tmp_dir, bed)
+        execute_system(compress_cmd, '[ Msg: Make bed for strelka ! ]',
+                       '[ Error: Something wrong with Make bed for strelka ! ]')
+        bed_cmd = '--callRegions %s/%s.gz' % (tmp_dir, bed)
+    else:
+        bed_cmd = ''
+    cf_cmd = '%s/bin/strelka2/bin/configureStrelkaGermlineWorkflow.py --bam %s --referenceFasta %s --runDir %s %s' % (
+        script_path, bam, reference, out_dir, bed_cmd)
+    execute_system(cf_cmd, '[ Msg: Configuration for strelka done ! ]',
+                   '[ Error: Something wrong with strelka configuration ! ]')
+    call_cmd = '%s/runWorkflow.py -m local -j %d' % (reference, thread)
+    execute_system(call_cmd, '[ Msg: Call variants with strelka done ! ]',
+                   '[ Error: Something wrong with strelka call variants ! ]')
+    final_vcf = out_dir + '/results/variants/variants.vcf.gz'
+    vcf_stats(final_vcf, report_dir, reference, script_path)
+    return final_vcf
 
 
-def vardict(infile, outdir, tmp_dir, report_dir, reference, sample_name, filter_freq=0.1, call_thread=12,
-            zip_thread=12):
-    outdir = outdir.rstrip('/') + '/'
-    report_dir = report_dir.rstrip('/') + '/'
-    tmp_dir = tmp_dir + sample_name + '/vardict/'
-    os.makedirs(tmp_dir)
-    _tmp_vcf1 = tmp_dir + sample_name + '.vardict.raw.vcf'
-    _tmp_vcf2 = tmp_dir + sample_name + '.vardict.flt.vcf'
-    _ziped_vcf = outdir + sample_name + '.vardict.vcf.gz'
+def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, prefix, thread, filter_freq=0.01):
+    if not bed:
+        bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
+    raw_vcf = '%s/%s.vardict.raw.vcf' % (tmp_dir, prefix)
+    final_vcf = '%s/%s.vardict.flt.vcf.gz' % (out_dir, prefix)
     # call snvs/indels
-    call_cmd = './bin/VarDict-1.7.0/bin/VarDict -G %s -b %s -f %.2f -N %s -z -c 1 -S 2 -E 3 -g 4 -th %d ' \
-               './lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed | teststrandbias.R | var2vcf_valid.pl -N %s -E ' \
-               '-f %.2f > %s' % (reference, infile, filter_freq, sample_name, call_thread, sample_name, filter_freq,
-                                 _tmp_vcf1)
-    execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by VarDict ! ]' % sample_name,
-                   '[ E: Something wrong with <%s> call snvs/indels by VarDict ! ]' % sample_name)
+    call_cmd = '%s/bin/vardict/bin/VarDict -G %s -b %s -f %.2f -N %s -c 1 -S 2 -E 3 -g 4 -th %d %s | ' \
+               '%s/bin/vardict/bin/teststrandbias.R | %s/bin/vardict/bin/var2vcf_valid.pl -N %s -E -f %.2f > %s' % (
+                   script_path, reference, bam, filter_freq, prefix, thread, bed, script_path, script_path, prefix,
+                   filter_freq, raw_vcf)
+    execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by VarDict ! ]' % prefix,
+                   '[ Error: Something wrong with <%s> call snvs/indels by VarDict ! ]' % prefix)
     # filter variations
-    filt_cmd = r'''perl -e 'map{chomp; if($_=~/^#/){print $_."\n";} elsif($_ =~/<dup-/){} else''' \
-               r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
-               r'''{ print $_."\n"}}}`cat %s`' | java -jar ./bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
-               r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" > %s''' % (
-                   _tmp_vcf1, _tmp_vcf2)
-    execute_system(filt_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % sample_name,
-                   '[ E: Something wrong with filter <%s> raw variations in VarDict ! ]' % sample_name)
-    # 合成前准备，包括合成列表文件，压缩，索引
-    # 压缩
-    zip_cmd = 'bgzip -c -f -@ %d %s > %s' % (zip_thread, _tmp_vcf2, _ziped_vcf)
-    execute_system(zip_cmd, '[ Msg: Bgzip <%s> vcf done in VarDict ! ]' % sample_name,
-                   '[ E: Something wrong with bgzip <%s> vcf in VarDict ! ]' % sample_name)
+    filter_cmd = r'''perl -e 'map{chomp; if($_=~/^#/){print $_."\n";} elsif($_ =~/<dup-/){} else''' \
+                 r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
+                 r'''{ print $_."\n"}}}`cat %s`' | java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
+                 r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" | ''' \
+                 r'''%s/bin/bgzip -c -f -@ %d > %s''' % (raw_vcf, script_path, script_path, thread, final_vcf)
+    execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % prefix,
+                   '[ Error : Something wrong with filter <%s> raw variations in VarDict ! ]' % prefix)
     # 建立索引
-    index_cmd = 'bcftools index -t %s' % _ziped_vcf
-    execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % sample_name,
-                   '[ E: Something wrong with build <%s> vcf index file in VarDict ! ]' % sample_name)
-    # 删除过程文件
-    rm_cmd = 'rm -f %s %s' % (_tmp_vcf1, _tmp_vcf2)
-    execute_system(rm_cmd, '[ Msg: Delete <%s> process file done in VarDict ! ]' % sample_name,
-                   '[ E: Something wrong with delete <%s> process file in VarDict ! ]' % sample_name)
+    index_cmd = '%s/bin/tabix index -t %s' % (script_path, final_vcf)
+    execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % prefix,
+                   '[ Error: Something wrong with build <%s> vcf index file in VarDict ! ]' % prefix)
     # vcf stats
-    vcf_stats(_ziped_vcf, report_dir, sample_name, reference)
-    return _ziped_vcf
+    vcf_stats(final_vcf, report_dir, reference, script_path)
+    return final_vcf
+
+
+def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, script_path, bed):
+    check_software('bcftools')
+    if bed:
+        bed_cmd = '-T %s' % bed
+    else:
+        bed_cmd = ''
+    raw_vcf = '%s/%s.bcftools.raw.vcf' % (tmp_dir, prefix)
+    final_vcf = '%s/%s.bcftools.flt.vcf.gz' % (out_dir, prefix)
+    # call snvs/indels
+    call_cmd = 'bcftools mpileup --threads {} {} -Ou -f {} {} | bcftools call --threads {} -mv -Oz -o {}'.format(
+        thread, bed_cmd, reference, bam, thread, raw_vcf)
+    execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by bcftools ! ]' % prefix,
+                   '[ Error: Something wrong with <%s> call snvs/indels by bcftools ! ]' % prefix)
+    # filter
+    filter_cmd = 'bcftools filter -s FILTER -g 10 -G 10 -i "%QUAL>20 && DP>6 && MQ>=40 && (DP4[2]+DP4[3])>4" ' + \
+                 '--threads %d -Ov %s | awk -F"\t" \'{if($1~/#/){print}else if($7~/PASS/){print}}\' | ' \
+                 '%s/bin/bgzip > %s' % (thread, raw_vcf, script_path, final_vcf)
+    execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in bcftools ! ]' % prefix,
+                   '[ Error: Something wrong with filter <%s> raw variations in bcftools ! ]' % prefix)
+    # 建立索引
+    index_cmd = '%s/bin/tabix index -t %s' % (script_path, final_vcf)
+    execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in bcftools ! ]' % prefix,
+                   '[ Error: Something wrong with build <%s> vcf index file in bcftools ! ]' % prefix)
+    # vcf stats
+    vcf_stats(final_vcf, report_dir, reference, script_path)
+    return final_vcf
+
+
+def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, prefix, thread, version="1.2.0"):
+    in_dir = os.path.dirname(bam)
+    out_dir = os.path.abspath(out_dir)
+    ref_dir = os.path.dirname(reference)
+    ref_name = os.path.basename(reference)
+    bam_name = os.path.basename(bam)
+    raw_vcf = prefix + '.deep.raw.vcf.gz'
+    g_vcf = prefix + '.deep.g.vcf.gz'
+    os.makedirs(out_dir + '/intermediate_results_dir')
+    final_vcf = '%s/%s.deep.flt.vcf.gz' % (out_dir, prefix)
+    if bed:
+        mt = 'WES'
+        cp_bed_cmd = 'cp %s %s/%s' % (bed, in_dir, bed)
+        execute_system(cp_bed_cmd, '[Msg: Copy bed for deep variants done! ]',
+                       '[Error: Something wrong with copy bed for deepvariants]')
+        region_cmd = '--regions /input/%s' % bed
+    else:
+        mt = 'WGS'
+        region_cmd = ''
+    # call
+    call_cmd = 'docker run -v "%s":"/input" -v "%s":"/output" -v "%s":"/ref" google/deepvariant:"%s" ' \
+               '/opt/deepvariant/bin/run_deepvariant --model_type %s --ref /ref/%s --reads /input/%s ' \
+               '--output_vcf /output/%s --output_gvcf /output/%s --num_shards %d ' \
+               '--intermediate_results_dir /output/intermediate_results_dir %s' % (
+                   in_dir, out_dir, ref_dir, version, mt, ref_name, bam_name, raw_vcf, g_vcf, thread, region_cmd)
+    execute_system(call_cmd, '[ Msg: <%s> deepvariant calling done ! ]' % prefix,
+                   '[ Error: Something wrong with <%s> deepvariant calling ! ]' % prefix)
+    # filter
+    filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 25) & (GEN[0].DP > 3) & (GEN[0].DP < 300) & ' \
+                 '(GEN[0].GQ > 20) & (GEN[0].VAF > 0.2) & (FILTER=\'PASS\')" %s/%s > %s' % (
+                     script_path, out_dir, raw_vcf, final_vcf)
+    execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
+                   '[ Error: Something wrong with filter raw variations in DeepVariant ! ]')
+    # vcf stats
+    vcf_stats(final_vcf, report_dir, reference, script_path)
+    return final_vcf
 
 
 def deepVariant_pre(infile, outdir, reference, sample_name, call_thread=12):
@@ -330,6 +369,11 @@ def deepVariant_pre(infile, outdir, reference, sample_name, call_thread=12):
                    indir, outdir, ref_dir, ref_name, bam_name, _vcf, g_vcf, call_thread)
     execute_system(call_cmd, '[ Msg: <%s> deepvariant calling done ! ]' % sample_name,
                    '[ E: Something wrong with <%s> deepvariant calling ! ]' % sample_name)
+    # filter
+    filter_cmd = 'java -jar ./bin/snpEff/SnpSift.jar filter "(QUAL >= 25) & (GEN[0].DP > 3) & (GEN[0].DP < 300) & ' \
+                 '(GEN[0].GQ > 20) & (GEN[0].VAF > 0.2) & (FILTER=\'PASS\')" %s > %s' % (merged_vcf, filter_vcf)
+    execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
+                   '[ E: Something wrong with filter raw variations in DeepVariant ! ]')
 
 
 def deepVariant(gvcf_list, outdir, report_dir, reference):

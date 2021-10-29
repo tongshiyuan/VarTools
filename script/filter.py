@@ -37,95 +37,66 @@ def frequency_filter(infile, out_file, fredb_list, threshold, retain_line):
                     if records[_] in db_retain[idx]:
                         out_.write(line)
                         break
-
-                af_max = 0.00000000001
+                else:
+                    for af_index in freq_index:
+                        if records[af_index] != '.' and eval(records[af_index]) >= threshold:
+                            break
+                    else:
+                        out_.write(line)
+            else:
                 for af_index in freq_index:
-                    if records[af_index] != '.' and eval(records[af_index]) >= af_max:
-                        af_max = eval(records[af_index])
-                if af_max < threshold:
+                    if records[af_index] != '.' and eval(records[af_index]) >= threshold:
+                        break
+                else:
                     out_.write(line)
-        # else:
-        #     for line in f:
-        #         if line:
-        #             records = line.strip().split('\t')
-        #             for index, db in enumerate(clin_index):
-        #                 if records[db] in clindb_dict[keys[index]]:
-        #                     out_.write(line)
-        #                     break
-        #             else:
-        #                 af_max = 0.00000000001
-        #                 for af_index in freq_index:
-        #                     if records[af_index] != '.' and eval(records[af_index]) >= af_max:
-        #                         af_max = eval(records[af_index])
-        #                 if af_max < threshold:
-        #                     out_.write(line)
     out_.close()
     print('[ Msg: Frequency filter done !]')
 
 
-def exonic_filter(infile, out_file, db_list, clindb_dict, reg_list):
+def exonic_filter(infile, out_file, gene_db, retain_line):
     print('[ Msg: Start exonic filter. ]')
-    # 功能区
-    fun_index = []
-    # 报道
-    clin_index = []
-    # 调控
-    reg_index = []
-    keys = []
+    keys, fun_index = [], []
     out_ = open(out_file, 'w')
     with open(infile) as f:
         line = f.readline()
         out_.write(line)
-        for _db in db_list:
+        for _db in gene_db.strip().strip(',').split(','):
             try:
-                fun_index.append(line.strip().split('\t').index(_db))
+                fun_index.append(line.strip().split('\t').index('Func.' + _db))
             except:
-                print('[ W: Can not find database <%s> in exonic filter ! ]' % _db)
+                print('[ Warn: Can not find database <Func.%s> in exonic filter ! ]' % _db)
         if not fun_index:
-            sys.exit('[ E: Can not find gene function database in exonic filter ! ]')
-        if clindb_dict:
-            for _db in clindb_dict.keys():
+            sys.exit('[ Error: Can not find gene function database in exonic filter ! ]')
+        db_col, db_retain = [], []
+        if retain_line:
+            for db_ln in retain_line.strip().rstrip(';').split(';'):
                 try:
-                    clin_index.append(line.strip().split('\t').index(_db))
-                    keys.append(_db)
+                    col = db_ln.strip().split(':')[0]
+                    col_idx = line.strip().split('\t').index(col)
+                    db_col.append(col_idx)
+                    db_retain.append(db_ln.strip().split(':')[1].strip().split('|'))
                 except:
-                    print('[ W: Can not find database <%s> in exonic filter ! ]' % _db)
-        else:
-            print('[ W: Program have not reported database in exonic filter ! ]')
-        if reg_list:
-            for _db in reg_list:
-                try:
-                    reg_index.append(line.strip().split('\t').index(_db))
-                except:
-                    print('[ W: Can not find database <%s> in exonic filter ! ]' % _db)
-        else:
-            print('[ W: Program have not regulation database in exonic filter ! ]')
+                    print('[ Warn: Something wrong with parsing retain expressions <%s> ! ]' % col)
+            if not db_col:
+                print('[ Warn: Program can not identify retain database in exonic filter ! ]')
         for line in f:
-            if line:
-                records = line.strip().split('\t')
-                for i in fun_index:
-                    if records[i].find('exonic') != -1 or records[i].find('splicing') != -1:
-                        out_.write(line)
-                        break
-                else:
-                    if clin_index:
-                        for index, db in enumerate(clin_index):
-                            if records[db] in clindb_dict[keys[index]]:
-                                out_.write(line)
-                                break
-                        else:
-                            if reg_index:
-                                for i in reg_index:
-                                    if records[i] != '.':
-                                        out_.write(line)
-                                        break
+            records = line.strip().split('\t')
+            for i in fun_index:
+                if records[i].find('exonic') != -1 or records[i].find('splicing') != -1 or records[i] == 'intron':
+                    out_.write(line)
+                    break
+            else:
+                if db_col:
+                    for idx, _ in enumerate(db_col):
+                        if records[_] in db_retain[idx]:
+                            out_.write(line)
+                            break
     out_.close()
     print('[ Msg: Exonic filter done !]')
 
 
 def synonymous_filter(infile, out_file, db_list, clindb_dict, con_dict):
     print('[ Msg: Start synonymous filter. ]')
-    start = time.perf_counter()
     # 变异类型
     type_index = []
     # 临床
@@ -183,8 +154,7 @@ def synonymous_filter(infile, out_file, db_list, clindb_dict, con_dict):
                                         out_.write(line)
                                         break
     out_.close()
-    end = time.perf_counter()
-    print('[ Msg: Synonymous filter done ! use time : < %d > s ]' % (end - start))
+    print('[ Msg: Synonymous filter done !]')
 
 
 def genetic_filter(infile, out_file, trio_list, gander):

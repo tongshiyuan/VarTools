@@ -28,16 +28,10 @@ def read_config(script_path, config_file):
     conf_dict['platform'] = config.get('map', 'platform')
     conf_dict['caller'] = config.get('call', 'short_var')
     conf_dict['af_db'] = config.get('anno', 'af_db')
-    conf_dict['af_type'] = config.get('anno', 'af_type')
     conf_dict['gene_db'] = config.get('anno', 'gene_db')
-    conf_dict['gene_type'] = config.get('anno', 'gene_type')
     conf_dict['anno_dir'] = config.get('anno', 'anno_dir')
     conf_dict['ref_version'] = config.get('anno', 'ref_version')
-    _ = config.get('filter', 'AFList')
-    conf_dict['AFList'] = [i.strip() for i in _.split(',')]
-    conf_dict['AFTh'] = eval(config.get('filter', 'AFThreshold'))
-    _ = config.get('filter', 'ClinList')
-    conf_dict['ClinList'] = [i.strip() for i in _.split(',')]
+    conf_dict['AFTh'] = eval(config.get('filter', 'af_threshold'))
     # case-control
     conf_dict['cc_AF'] = config.get('cc_filter', 'AF_list')
     conf_dict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
