@@ -3,7 +3,7 @@ import sys
 import configparser
 from script.qc import fastp_qc
 from script.mapping import bam_deal, bam_stats
-from script.calling import gatk_pre, gatk, gatk_hard_filter
+from script.calling import gatk_pre, gatk, gatk_hard_filter, vardict, deep_variant_single, bcftools, strelka
 from script.common import check_software, affinity, execute_system, gender_determined
 from script.case_control import get_matrix, burden
 
@@ -110,15 +110,27 @@ def f2v(in_dir, out_dir, bed, prefix,
             os.makedirs(vcf_rep_dir)
             vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
                                         script_path, bed, keep_tmp)
+    elif config['caller'] == 'vardict':
+        vcf_rep_dir = out_dir + '/reports/vcfQC'
+        os.makedirs(vcf_rep_dir)
+        vcf_file = vardict(bam_file, rst_out_dir, config['reference'], bed, vcf_rep_dir, tmp_dir, script_path,
+                           sample_name, thread, filter_freq=0.01)
+    elif config['caller'] == 'strelka2':
+        vcf_rep_dir = out_dir + '/reports/vcfQC'
+        os.makedirs(vcf_rep_dir)
+        vcf_file = strelka(bam_file, rst_out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir)
+    elif config['caller'] == 'deepvariants':
+        vcf_rep_dir = out_dir + '/reports/vcfQC'
+        os.makedirs(vcf_rep_dir)
+        vcf_file = deep_variant_single(bam_file, rst_out_dir, config['reference'], bed, vcf_rep_dir, script_path,
+                                       sample_name, thread, version="1.2.0")
+    elif config['caller'] == 'bcftools':
+        vcf_rep_dir = out_dir + '/reports/vcfQC'
+        os.makedirs(vcf_rep_dir)
+        vcf_file = bcftools(bam_file, rst_out_dir, tmp_dir, vcf_rep_dir, config['reference'], sample_name, thread,
+                            script_path, bed)
     else:
-        print(['[ Msg: Now software only calling by gatk. ]'])
-        gvcf = gatk_pre(bam_file, rst_out_dir, tmp_dir,
-                        config['reference'], sample_name, config['gatk_bundle'], script_path, bed, keep_tmp)
-        if vcf:
-            vcf_rep_dir = out_dir + '/reports/vcfQC'
-            os.makedirs(vcf_rep_dir)
-            vcf_file = gatk_hard_filter(gvcf, rst_out_dir, vcf_rep_dir, tmp_dir, sample_name, config['reference'],
-                                        script_path, bed, keep_tmp)
+        sys.exit('[Msg: Can not identify caller <%s>. ]' % config['caller'])
 
 
 def bamQC(bam, bed, out_dir, tmp_dir, script_path, thread, bq, keep_tmp, gender_rate):
