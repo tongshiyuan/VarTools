@@ -298,7 +298,9 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
 
 
 def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, script_path, bed, nqc=False):
-    check_software('bcftools')
+    rst = check_software('bcftools')
+    if rst:
+        sys.exit('[ Error: Can not open <bcftools>.]')
     if bed:
         bed_cmd = '-T %s' % bed
     else:
@@ -346,14 +348,39 @@ def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, p
     else:
         mt = 'WGS'
         region_cmd = ''
-    # call
-    call_cmd = 'docker run -v "%s":"/input" -v "%s":"/output" -v "%s":"/ref" google/deepvariant:"%s" ' \
-               '/opt/deepvariant/bin/run_deepvariant --model_type %s --ref /ref/%s --reads /input/%s ' \
-               '--output_vcf /output/%s --output_gvcf /output/%s --num_shards %d ' \
-               '--intermediate_results_dir /output/intermediate_results_dir %s' % (
-                   in_dir, out_dir, ref_dir, version, mt, ref_name, bam_name, raw_vcf, g_vcf, thread, region_cmd)
+    rst = check_software('docker')
+    if rst:
+        print('[ Warn: Can not open <docker>. Try to use Singularity.]')
+        rst = check_software('singularity')
+        if rst:
+            sys.exit('[ Error: Can not open <Singularity>.]')
+        else:
+            if not os.path.isfile('%s/bin/deepvariant_latest.sif' % script_path):
+                pull_cmd = 'singularity pull docker:google/deepvariant && ' \
+                           'mv deepvariant_latest.sif %s/bin/' % script_path
+                execute_system(pull_cmd, '[ Msg: pull deepvariant image done ! ]' % prefix,
+                               '[ Error: Can not pull deepvariant image ! ]' % prefix)
+            # singularity call
+            call_cmd = 'singularity exec --bind %s:/input,%s:/output,%s:/ref %s/bin/deepvariant_latest.sif ' \
+                       '/opt/deepvariant/bin/run_deepvariant -model_type %s ' \
+                       '--ref /ref/%s ' \
+                       '--reads /input/%s ' \
+                       '--output_vcf /output/%s ' \
+                       '--output_gvcf /output/%s ' \
+                       '--intermediate_results_dir /output/intermediate_results_dir ' \
+                       '--num_shards %d %s' % (
+                           in_dir, out_dir, ref_dir, script_path, mt, ref_name, bam_name, raw_vcf, g_vcf, thread,
+                           region_cmd)
+    else:
+        # docker call
+        call_cmd = 'docker run -v "%s":"/input" -v "%s":"/output" -v "%s":"/ref" google/deepvariant:"%s" ' \
+                   '/opt/deepvariant/bin/run_deepvariant --model_type %s --ref /ref/%s --reads /input/%s ' \
+                   '--output_vcf /output/%s --output_gvcf /output/%s --num_shards %d ' \
+                   '--intermediate_results_dir /output/intermediate_results_dir %s' % (
+                       in_dir, out_dir, ref_dir, version, mt, ref_name, bam_name, raw_vcf, g_vcf, thread, region_cmd)
     execute_system(call_cmd, '[ Msg: <%s> deepvariant calling done ! ]' % prefix,
                    '[ Error: Something wrong with <%s> deepvariant calling ! ]' % prefix)
+
     # filter
     filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 25) & (GEN[0].DP > 3) & (GEN[0].DP < 300) & ' \
                  '(GEN[0].GQ > 20) & (GEN[0].VAF > 0.2) & (FILTER=\'PASS\')" %s/%s > %s' % (
