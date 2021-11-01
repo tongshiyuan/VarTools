@@ -247,3 +247,33 @@ def trio_analysis():
     #                            config['AFTh'],
     #                            config['anno_dir'], config['ref_version'], thread)
     # print('[ Msg: All sample gatk calling done ! ]')
+
+
+def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, config_file, script_path, noqc):
+    config = read_config(script_path, config_file)
+    out_dir = os.path.abspath(out_dir)
+    vcf_rep_dir = out_dir + '/reports/vcfQC'
+    os.makedirs(vcf_rep_dir)
+    if caller == 'gatk_hard':
+        gvcf = gatk_pre(bam, out_dir, tmp_dir,
+                        config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
+        vcf_file = gatk([gvcf], out_dir, vcf_rep_dir, config['reference'], config['gatk_bundle'], script_path, prefix,
+                        bed, tmp_dir, keep_tmp, noqc)
+    elif caller == 'gatk':
+        gvcf = gatk_pre(bam, out_dir, tmp_dir,
+                        config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
+        vcf_file = gatk_hard_filter(gvcf, out_dir, vcf_rep_dir, tmp_dir, prefix, config['reference'], script_path, bed,
+                                    keep_tmp, noqc)
+    elif caller == 'vardict':
+        vcf_file = vardict(bam, out_dir, config['reference'], bed, vcf_rep_dir, tmp_dir, script_path, prefix, thread,
+                           0.01, noqc)
+    elif config['caller'] == 'strelka2':
+        vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc)
+    elif config['caller'] == 'deepvariants':
+        vcf_file = deep_variant_single(bam, out_dir, config['reference'], bed, vcf_rep_dir, script_path, prefix, thread,
+                                       noqc, version="1.2.0")
+    elif config['caller'] == 'bcftools':
+        vcf_file = bcftools(bam, out_dir, tmp_dir, vcf_rep_dir, config['reference'], prefix, thread, script_path, bed,
+                            noqc)
+    else:
+        sys.exit('[Msg: Can not identify caller <%s>. ]' % config['caller'])

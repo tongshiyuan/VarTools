@@ -68,7 +68,8 @@ def gatk_pre(bam, out_dir, tmp_dir, reference, prefix, gatk_bundle_dir, script_p
     return g_vcf
 
 
-def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path, prefix, bed, tmp_dir, keep_tmp):
+def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path, prefix, bed, tmp_dir, keep_tmp,
+         nqc=False):
     merged_gvcf = '%s/%scohort.g.vcf.gz' % (out_dir, prefix)
     cohort_vcf = '%s/%scohort.raw.vcf.gz' % (out_dir, prefix)
     excesshet = '%s/%scohort_excesshet.vcf.gz' % (tmp_dir, prefix)
@@ -81,14 +82,17 @@ def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path
     final_vcf = '%s/%scohort.filter.vcf.gz' % (out_dir, prefix)
     # mergeGVCFs
     sample_gvcf = ''
-    for i in gvcf_list:
-        sample_gvcf += '-V %s ' % i
-    merge_cmd = script_path + '/bin/gatk/gatk CombineGVCFs --tmp-dir %s -R %s %s -O %s ' % (
-        tmp_dir, reference, sample_gvcf, merged_gvcf)
-    if bed:
-        merge_cmd += '-L %s' % bed
-    execute_system(merge_cmd, '[ Msg: GATK combine gvcfs done ! ]',
-                   '[ Error: Something wrong with combine gvcfs in GATK ! ]')
+    if len(gvcf_list) == 1:
+        merged_gvcf = gvcf_list[0]
+    else:
+        for i in gvcf_list:
+            sample_gvcf += '-V %s ' % i
+        merge_cmd = script_path + '/bin/gatk/gatk CombineGVCFs --tmp-dir %s -R %s %s -O %s ' % (
+            tmp_dir, reference, sample_gvcf, merged_gvcf)
+        if bed:
+            merge_cmd += '-L %s' % bed
+        execute_system(merge_cmd, '[ Msg: GATK combine gvcfs done ! ]',
+                       '[ Error: Something wrong with combine gvcfs in GATK ! ]')
     # GenotypeGVCFs
     gt_cmd = script_path + '/bin/gatk/gatk GenotypeGVCFs --tmp-dir %s -R %s -V %s -O %s' % (
         tmp_dir, reference, merged_gvcf, cohort_vcf)
@@ -186,11 +190,12 @@ def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path
         execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
                        '[ Error: Something wrong with delete process file in gatk ! ]')
     # vcf stats
-    vcf_stats(final_vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
 
 
-def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, script_path, bed, keep_tmp):
+def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, script_path, bed, keep_tmp, nqc=False):
     raw_vcf = '%s/%s.gatk.raw.vcf.gz' % (out_dir, prefix)
     snv_vcf = '%s/%s.gatk.snvs.vcf.gz' % (tmp_dir, prefix)
     snv_filted_vcf = '%s/%s.gatk.snvs.filtered.vcf.gz' % (tmp_dir, prefix)
@@ -234,11 +239,12 @@ def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, scr
         execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
                        '[ Error: Something wrong with delete process file in gatk ! ]')
     # vcf stats
-    vcf_stats(vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(vcf, report_dir, reference, script_path)
     return vcf
 
 
-def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir):
+def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir, nqc=False):
     out_dir += '/strelka_workplace'
     if bed:
         compress_cmd = 'cp %s %s && %s/bin/bgzip %s/%s && %s/bin/tabix -b 2 -e 3 -p bed %s/%s.gz' % (
@@ -256,11 +262,12 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
     execute_system(call_cmd, '[ Msg: Call variants with strelka done ! ]',
                    '[ Error: Something wrong with strelka call variants ! ]')
     final_vcf = out_dir + '/results/variants/variants.vcf.gz'
-    vcf_stats(final_vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
 
 
-def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, prefix, thread, filter_freq=0.01):
+def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, prefix, thread, filter_freq, nqc=False):
     if not bed:
         bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
     raw_vcf = '%s/%s.vardict.raw.vcf' % (tmp_dir, prefix)
@@ -285,11 +292,12 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in VarDict ! ]' % prefix)
     # vcf stats
-    vcf_stats(final_vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
 
 
-def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, script_path, bed):
+def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, script_path, bed, nqc=False):
     check_software('bcftools')
     if bed:
         bed_cmd = '-T %s' % bed
@@ -313,11 +321,13 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in bcftools ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in bcftools ! ]' % prefix)
     # vcf stats
-    vcf_stats(final_vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
 
 
-def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, prefix, thread, version="1.2.0"):
+def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, prefix, thread, nqc=False,
+                        version="1.2.0"):
     in_dir = os.path.dirname(bam)
     out_dir = os.path.abspath(out_dir)
     ref_dir = os.path.dirname(reference)
@@ -351,57 +361,9 @@ def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, p
     execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
                    '[ Error: Something wrong with filter raw variations in DeepVariant ! ]')
     # vcf stats
-    vcf_stats(final_vcf, report_dir, reference, script_path)
+    if not nqc:
+        vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
-
-
-def deepVariant_pre(infile, outdir, reference, sample_name, call_thread=12):
-    indir = os.path.dirname(infile)
-    outdir = os.path.abspath(outdir)
-    ref_dir = os.path.dirname(reference)
-    ref_name = os.path.basename(reference)
-    bam_name = os.path.basename(infile)
-    g_vcf = outdir + '/' + sample_name + '.deep.g.vcf.gz'
-    _vcf = outdir + '/' + sample_name + '.deep.vcf.gz'
-    call_cmd = 'docker run -v "%s":"/input" -v "%s":"/output" -v "%s":"/ref" google/deepvariant:"0.9.0" ' \
-               '/opt/deepvariant/bin/run_deepvariant --model_type=WGS --ref=/ref/%s --reads=/input/%s ' \
-               '--output_vcf=/output/%s --output_gvcf=/output/%s --num_shards=%d' % (
-                   indir, outdir, ref_dir, ref_name, bam_name, _vcf, g_vcf, call_thread)
-    execute_system(call_cmd, '[ Msg: <%s> deepvariant calling done ! ]' % sample_name,
-                   '[ E: Something wrong with <%s> deepvariant calling ! ]' % sample_name)
-    # filter
-    filter_cmd = 'java -jar ./bin/snpEff/SnpSift.jar filter "(QUAL >= 25) & (GEN[0].DP > 3) & (GEN[0].DP < 300) & ' \
-                 '(GEN[0].GQ > 20) & (GEN[0].VAF > 0.2) & (FILTER=\'PASS\')" %s > %s' % (merged_vcf, filter_vcf)
-    execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
-                   '[ E: Something wrong with filter raw variations in DeepVariant ! ]')
-
-
-def deepVariant(gvcf_list, outdir, report_dir, reference):
-    outdir = os.path.abspath(outdir)
-    merged_vcf = outdir + '/cohort.merged.vcf.gz'
-    filter_vcf = outdir + '/cohort.filter.vcf.gz'
-    colist = gvcf_list[0].split('/')
-    for gvcf in gvcf_list[1:]:
-        for num, i in enumerate(gvcf.split('/')):
-            if len(colist) > num and i != colist[num]:
-                colist = colist[:num]
-    indir = '/'.join(colist)
-    gvcf_str = ''
-    for i in gvcf_list:
-        gvcf_str += '/data%s ' % i[len(indir):]
-    merge_cmd = 'docker run -v "%s":"/data" -v "%s":"/out" quay.io/mlin/glnexus:v1.2.2 ' \
-                '/usr/local/bin/glnexus_cli --config DeepVariantWGS ' \
-                '%s| bcftools view - | bgzip -c > /out/%s' % (indir, outdir, gvcf_str, merged_vcf)
-    execute_system(merge_cmd, '[ Msg: DeepVariant combine gvcfs done ! ]',
-                   '[ E: Something wrong with combine gvcfs in deepVariant ! ]')
-    # filter
-    filter_cmd = 'java -jar ./bin/snpEff/SnpSift.jar filter "(QUAL >= 25) & (GEN[0].DP > 3) & (GEN[0].DP < 300) & ' \
-                 '(GEN[0].GQ > 20) & (GEN[0].VAF > 0.2) & (FILTER=\'PASS\')" %s > %s' % (merged_vcf, filter_vcf)
-    execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
-                   '[ E: Something wrong with filter raw variations in DeepVariant ! ]')
-    # vcf stats
-    # vcf_stats(merged_vcf, report_dir, reference)
-    return merged_vcf
 
 
 def vcf_stats(vcf, report_dir, reference, script_path):

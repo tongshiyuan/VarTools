@@ -18,7 +18,7 @@ import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify
+from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify, variants_call
 from script.case_control import build_snvdb
 
 
@@ -182,6 +182,25 @@ def gd_args(args):
     return argsd
 
 
+def call_args(args):
+    argsd = {}
+    if not args.bam:
+        sys.exit('[ Error: Sample incomplete ! ]')
+    else:
+        argsd['bam'] = os.path.realpath(args.bam)
+    argsd['out_dir'] = args.out_dir
+    argsd['bed'] = args.bed
+    check_bed(argsd['bed'])
+    argsd['thread'] = args.thread
+    argsd['tmp_dir'] = args.tmp_dir
+    argsd['keep_tmp'] = args.keep_tmp
+    argsd['prefix'] = args.prefix
+    argsd['config'] = args.config
+    argsd['caller'] = args.caller
+    argsd['novcfqc'] = args.noqc
+    return argsd
+
+
 def ana_args():
     description = '=' * 77 + '\nVarTools 0.1.0 20211011\nWorkflow of WGS/WES analysis.\n' + '=' * 77
     print(description)
@@ -195,12 +214,13 @@ function of VarTools:
     (5) cc: case-control analysis with GRIPT.
     (6) bqc: bam quality check.
     (7) gd: gender identify.
+    (8) call: call variants from bam.
     ----------
-    (8) tSV: call trio SV with clinSV (only for WGS).
-    (9) sSV: call single SV with clinSV (only for WGS).
-    (10) tA: trio analysis.
-    (11) sA: single case analysis.
-    (12) bt: Burden testing with TRAPD.
+    (9) tSV: call trio SV with clinSV (only for WGS).
+    (10) sSV: call single SV with clinSV (only for WGS).
+    (11) tA: trio analysis.
+    (12) sA: single case analysis.
+    (13) bt: Burden testing with TRAPD.
     -----------
     To get help on a particular command, call it with -h/--help.
     '''
@@ -216,7 +236,8 @@ function of VarTools:
         'sSV': 'call single SV with clinSV (only for WGS).',
         'sA': 'single case analysis.',
         'tA': 'trio analysis.',
-        'gd': 'identify gender from bam coverage.'
+        'gd': 'identify gender from bam coverage.',
+        'call': 'call variants from bam'
     }
 
     if len(sys.argv) == 1 or sys.argv[1] in ['--help', 'help', '-h']:
@@ -349,6 +370,24 @@ function of VarTools:
         parser.add_argument('-r', '--rate', default=20, type=float, help='coverage rate of X/Y [20].')
         args = parser.parse_args()
         args_dict = gd_args(args)
+    elif sys.argv[1] == 'call':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s call [options] -i bam')
+        parser.description = function['call']
+        parser.add_argument('call')
+        parser.add_argument('-i', '--bam', required=True, help='bam file for calling, must be sorted and index.')
+        parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
+        parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
+        parser.add_argument('-c', '--caller', default='gatk',
+                            help='caller, now support gatk(_hard)/deepvariant/bcftools/vardict/strelka2 [gatk].')
+        parser.add_argument('--prefix', default='result', help='prefix of output file.[result].')
+        parser.add_argument('--tmp_dir', default=False,
+                            help='temp directory, if not, it will create in the result directory.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        parser.add_argument('--noqc', action='store_true', help='keep temp directory.')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        args = parser.parse_args()
+        args_dict = call_args(args)
     else:
         sys.exit('[ Error: Can not identify the function of <%s>]' % sys.argv[1])
 
@@ -400,6 +439,9 @@ def main():
         pass
     elif args['fun'] == 'sA':
         pass
+    elif args['fun'] == 'call':
+        variants_call(args['bam'], args['out_dir'], args['caller'], args['bed'], args['prefix'], args['thread'],
+                      args['tmp_dir'], args['keep_tmp'], args['config'], args['script_path'], args['novcfqc'])
 
 
 if __name__ == '__main__':
