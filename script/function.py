@@ -252,6 +252,10 @@ def trio_analysis():
 def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, config_file, script_path, noqc):
     config = read_config(script_path, config_file)
     out_dir = os.path.abspath(out_dir)
+    if not tmp_dir:
+        tmp_dir = '%s/tmp_dir' % out_dir
+    if not os.path.isdir(tmp_dir):
+        os.makedirs(tmp_dir)
     vcf_rep_dir = out_dir + '/reports/vcfQC'
     os.makedirs(vcf_rep_dir)
     if caller == 'gatk_hard':

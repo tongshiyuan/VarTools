@@ -379,7 +379,7 @@ function of VarTools:
         parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
         parser.add_argument('-c', '--caller', default='gatk',
                             help='caller, now support gatk(_hard)/deepvariant/bcftools/vardict/strelka2 [gatk].')
-        parser.add_argument('--prefix', default='result', help='prefix of output file.[result].')
+        parser.add_argument('-p', '--prefix', default='result', help='prefix of output file.[result].')
         parser.add_argument('--tmp_dir', default=False,
                             help='temp directory, if not, it will create in the result directory.')
         parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
