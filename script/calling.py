@@ -296,7 +296,7 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
     execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % prefix,
                    '[ Error : Something wrong with filter <%s> raw variations in VarDict ! ]' % prefix)
     # 建立索引
-    index_cmd = 'tabix index -t %s' % final_vcf
+    index_cmd = 'tabix index %s' % final_vcf
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in VarDict ! ]' % prefix)
     # vcf stats
@@ -329,7 +329,7 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
     execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in bcftools ! ]' % prefix,
                    '[ Error: Something wrong with filter <%s> raw variations in bcftools ! ]' % prefix)
     # 建立索引
-    index_cmd = 'tabix index -t %s' % final_vcf
+    index_cmd = 'tabix index %s' % final_vcf
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in bcftools ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in bcftools ! ]' % prefix)
     # vcf stats
