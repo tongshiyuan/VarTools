@@ -262,7 +262,7 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
         script_path, bam, reference, out_dir, bed_cmd)
     execute_system(cf_cmd, '[ Msg: Configuration for strelka done ! ]',
                    '[ Error: Something wrong with strelka configuration ! ]')
-    call_cmd = '%s/runWorkflow.py -m local -j %d' % (reference, thread)
+    call_cmd = '%s/runWorkflow.py -m local -j %d' % (out_dir, thread)
     execute_system(call_cmd, '[ Msg: Call variants with strelka done ! ]',
                    '[ Error: Something wrong with strelka call variants ! ]')
     final_vcf = out_dir + '/results/variants/variants.vcf.gz'
