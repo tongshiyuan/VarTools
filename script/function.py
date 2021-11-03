@@ -271,13 +271,13 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
     elif caller == 'vardict':
         vcf_file = vardict(bam, out_dir, config['reference'], bed, vcf_rep_dir, tmp_dir, script_path, prefix, thread,
                            0.01, noqc)
-    elif config['caller'] == 'strelka2':
+    elif caller == 'strelka2':
         vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc)
-    elif config['caller'] == 'deepvariants':
+    elif caller == 'deepvariants':
         vcf_file = deep_variant_single(bam, out_dir, config['reference'], bed, vcf_rep_dir, script_path, prefix, thread,
                                        noqc, version="1.2.0")
-    elif config['caller'] == 'bcftools':
+    elif caller == 'bcftools':
         vcf_file = bcftools(bam, out_dir, tmp_dir, vcf_rep_dir, config['reference'], prefix, thread, script_path, bed,
                             noqc)
     else:
-        sys.exit('[Msg: Can not identify caller <%s>. ]' % config['caller'])
+        sys.exit('[Error: Can not identify caller <%s>. ]' % caller)

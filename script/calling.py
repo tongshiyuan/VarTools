@@ -277,7 +277,10 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
     if rst1 or rst2:
         sys.exit('[ Error: Can not open <bgzip> or <tabix>.]')
     if not bed:
-        bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
+        if reference.find('38') != -1:
+            bed = script_path + '/lib/VarDict_assembly38_fromBroad_5k_150bpOL_seg.bed'
+        else:
+            bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
     raw_vcf = '%s/%s.vardict.raw.vcf' % (tmp_dir, prefix)
     final_vcf = '%s/%s.vardict.flt.vcf.gz' % (out_dir, prefix)
     # call snvs/indels
