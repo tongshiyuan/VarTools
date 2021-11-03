@@ -245,10 +245,14 @@ def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, scr
 
 
 def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir, nqc=False):
+    rst1 = check_software('bgzip')
+    rst2 = check_software('tabix')
+    if rst1 or rst2:
+        sys.exit('[ Error: Can not open <bgzip> or <tabix>.]')
     out_dir += '/strelka_workplace'
     if bed:
-        compress_cmd = 'cp %s %s && %s/bin/bgzip %s/%s && %s/bin/tabix -b 2 -e 3 -p bed %s/%s.gz' % (
-            bed, tmp_dir, script_path, tmp_dir, bed, script_path, tmp_dir, bed)
+        compress_cmd = 'cp %s %s && bgzip %s/%s && tabix -b 2 -e 3 -p bed %s/%s.gz' % (
+            bed, tmp_dir, tmp_dir, bed, tmp_dir, bed)
         execute_system(compress_cmd, '[ Msg: Make bed for strelka ! ]',
                        '[ Error: Something wrong with Make bed for strelka ! ]')
         bed_cmd = '--callRegions %s/%s.gz' % (tmp_dir, bed)
@@ -268,12 +272,16 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
 
 
 def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, prefix, thread, filter_freq, nqc=False):
+    rst1 = check_software('bgzip')
+    rst2 = check_software('tabix')
+    if rst1 or rst2:
+        sys.exit('[ Error: Can not open <bgzip> or <tabix>.]')
     if not bed:
         bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
     raw_vcf = '%s/%s.vardict.raw.vcf' % (tmp_dir, prefix)
     final_vcf = '%s/%s.vardict.flt.vcf.gz' % (out_dir, prefix)
     # call snvs/indels
-    call_cmd = '%s/bin/vardict/bin/VarDict -G %s -b %s -f %.2f -N %s -c 1 -S 2 -E 3 -g 4 -th %d %s | ' \
+    call_cmd = '%s/bin/vardict/bin/VarDict -G %s -b %s -f %.2f -N %s -c 1 -S 2 -E 3 -g 4 -th %d %s | Rscript ' \
                '%s/bin/vardict/bin/teststrandbias.R | %s/bin/vardict/bin/var2vcf_valid.pl -N %s -E -f %.2f > %s' % (
                    script_path, reference, bam, filter_freq, prefix, thread, bed, script_path, script_path, prefix,
                    filter_freq, raw_vcf)
@@ -284,11 +292,11 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
                  r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
                  r'''{ print $_."\n"}}}`cat %s`' | java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
                  r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" | ''' \
-                 r'''%s/bin/bgzip -c -f -@ %d > %s''' % (raw_vcf, script_path, script_path, thread, final_vcf)
+                 r'''bgzip -c -f -@ %d > %s''' % (raw_vcf, script_path, thread, final_vcf)
     execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % prefix,
                    '[ Error : Something wrong with filter <%s> raw variations in VarDict ! ]' % prefix)
     # 建立索引
-    index_cmd = '%s/bin/tabix index -t %s' % (script_path, final_vcf)
+    index_cmd = 'tabix index -t %s' % final_vcf
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in VarDict ! ]' % prefix)
     # vcf stats
@@ -299,8 +307,10 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
 
 def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, script_path, bed, nqc=False):
     rst = check_software('bcftools')
-    if rst:
-        sys.exit('[ Error: Can not open <bcftools>.]')
+    rst1 = check_software('bgzip')
+    rst2 = check_software('tabix')
+    if rst or rst1 or rst2:
+        sys.exit('[ Error: Can not open <bgzip> or <tabix> or <bcftools>.]')
     if bed:
         bed_cmd = '-T %s' % bed
     else:
@@ -315,11 +325,11 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
     # filter
     filter_cmd = 'bcftools filter -s FILTER -g 10 -G 10 -i "%QUAL>20 && DP>6 && MQ>=40 && (DP4[2]+DP4[3])>4" ' + \
                  '--threads %d -Ov %s | awk -F"\t" \'{if($1~/#/){print}else if($7~/PASS/){print}}\' | ' \
-                 '%s/bin/bgzip > %s' % (thread, raw_vcf, script_path, final_vcf)
+                 'bgzip > %s' % (thread, raw_vcf, final_vcf)
     execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in bcftools ! ]' % prefix,
                    '[ Error: Something wrong with filter <%s> raw variations in bcftools ! ]' % prefix)
     # 建立索引
-    index_cmd = '%s/bin/tabix index -t %s' % (script_path, final_vcf)
+    index_cmd = 'tabix index -t %s' % final_vcf
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in bcftools ! ]' % prefix,
                    '[ Error: Something wrong with build <%s> vcf index file in bcftools ! ]' % prefix)
     # vcf stats

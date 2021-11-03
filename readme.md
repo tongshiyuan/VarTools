@@ -77,9 +77,10 @@ python VarTools gd -b in.bam -d bed
 - [strelka2](https://github.com/Illumina/strelka/releases/download/v2.9.2/strelka-2.9.2.centos6_x86_64.tar.bz2)
 - [GATK](https://github.com/broadinstitute/gatk/releases/download/4.2.0.0/gatk-4.2.0.0.zip)
 - [bcftools](https://github.com/samtools/bcftools/releases/download/1.14/bcftools-1.14.tar.bz2)
+  - note: please install by yourself and ensure the ability to execute.
 - [VarDictJava](https://hub.fastgit.org/AstraZeneca-NGS/VarDictJava/releases/download/v1.8.2/VarDict-1.8.2.zip)
-- bgzip
-- tabix
+- [htslib](https://github.com/samtools/htslib/releases/download/1.14/htslib-1.14.tar.bz2)
+  - note: please install by yourself and ensure the ability of `tabix` and `bgzip` to execute.
 - [SnpEff](https://snpeff.blob.core.windows.net/versions/snpEff_latest_core.zip)
 - [kings](https://www.kingrelatedness.com/Linux-king.tar.gz)
 - [VariantQC](https://github.com/BimberLab/DISCVRSeq/releases/download/1.3.2/DISCVRSeq-1.3.2.jar)
