@@ -258,12 +258,12 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
         os.makedirs(tmp_dir)
     vcf_rep_dir = out_dir + '/reports/vcfQC'
     os.makedirs(vcf_rep_dir)
-    if caller == 'gatk_hard':
+    if caller == 'gatk':
         gvcf = gatk_pre(bam, out_dir, tmp_dir,
                         config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
         vcf_file = gatk([gvcf], out_dir, vcf_rep_dir, config['reference'], config['gatk_bundle'], script_path, prefix,
                         bed, tmp_dir, keep_tmp, noqc)
-    elif caller == 'gatk':
+    elif caller == 'gatk_hard':
         gvcf = gatk_pre(bam, out_dir, tmp_dir,
                         config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
         vcf_file = gatk_hard_filter(gvcf, out_dir, vcf_rep_dir, tmp_dir, prefix, config['reference'], script_path, bed,

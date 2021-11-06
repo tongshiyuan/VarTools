@@ -74,10 +74,10 @@ def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path
     cohort_vcf = '%s/%scohort.raw.vcf.gz' % (out_dir, prefix)
     excesshet = '%s/%scohort_excesshet.vcf.gz' % (tmp_dir, prefix)
     sitesonly = '%s/%scohort_sitesonly.vcf.gz' % (tmp_dir, prefix)
-    indels_recal = '%s/%cohort_indels.recal' % (tmp_dir, prefix)
+    indels_recal = '%s/%scohort_indels.recal' % (tmp_dir, prefix)
     indels_tranches = '%s/%scohort_indels.tranches' % (tmp_dir, prefix)
     indels_vcf = '%s/%sindel.recalibrated.vcf.gz' % (tmp_dir, prefix)
-    snp_recal = '%s/%cohort_snps.recal' % (tmp_dir, prefix)
+    snp_recal = '%s/%scohort_snps.recal' % (tmp_dir, prefix)
     snp_tranches = '%s/%scohort_snps.tranches' % (tmp_dir, prefix)
     final_vcf = '%s/%scohort.filter.vcf.gz' % (out_dir, prefix)
     # mergeGVCFs
@@ -325,6 +325,10 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
         thread, bed_cmd, reference, bam, thread, raw_vcf)
     execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by bcftools ! ]' % prefix,
                    '[ Error: Something wrong with <%s> call snvs/indels by bcftools ! ]' % prefix)
+    # 建立索引
+    index_cmd = 'tabix %s' % raw_vcf
+    execute_system(index_cmd, '[ Msg: Build raw vcf file index done in bcftools ! ]',
+                   '[ Error: Something wrong with build raw vcf index file in bcftools ! ]')
     # filter
     filter_cmd = 'bcftools filter -s FILTER -g 10 -G 10 -i "%QUAL>20 && DP>6 && MQ>=40 && (DP4[2]+DP4[3])>4" ' + \
                  '--threads %d -Ov %s | awk -F"\t" \'{if($1~/#/){print}else if($7~/PASS/){print}}\' | ' \
