@@ -1,8 +1,9 @@
 import os
 import sys
 import configparser
-from script.qc import fastp_qc
-from script.mapping import bam_deal, bam_stats
+from script.fastq_qc import fastp_qc
+from script.bam_qc import bam_stats
+from script.mapping import bam_deal
 from script.calling import gatk_pre, gatk, gatk_hard_filter, vardict, deep_variant_single, bcftools, strelka
 from script.common import check_software, affinity, execute_system, gender_determined
 from script.case_control import get_matrix, burden
