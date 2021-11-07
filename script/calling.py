@@ -285,6 +285,7 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
         else:
             bed = script_path + '/lib/VarDict_assembly19_fromBroad_5k_150bpOL_seg.bed'
     raw_vcf = '%s/%s.vardict.raw.vcf' % (tmp_dir, prefix)
+    sort_var_vcf = '%s/%s.vardict.short_var.vcf' % (tmp_dir, prefix)
     final_vcf = '%s/%s.vardict.flt.vcf.gz' % (out_dir, prefix)
     # call snvs/indels
     call_cmd = '%s/bin/vardict/bin/VarDict -G %s -b %s -f %.2f -N %s -c 1 -S 2 -E 3 -g 4 -th %d %s | Rscript ' \
@@ -293,17 +294,25 @@ def vardict(bam, out_dir, reference, bed, report_dir, tmp_dir, script_path, pref
                    filter_freq, raw_vcf)
     execute_system(call_cmd, '[ Msg: <%s> call snvs/indels done by VarDict ! ]' % prefix,
                    '[ Error: Something wrong with <%s> call snvs/indels by VarDict ! ]' % prefix)
+    filter_cmd = r'''perl -e 'map{chomp; if($_=~/^#/){print $_."\n";} elsif($_ =~/<dup-/){} else''' \
+                 r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
+                 r'''{ print $_."\n"}}}`cat %s`' > %s''' % (raw_vcf, sort_var_vcf)
+    execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % prefix,
+                   '[ Error : Something wrong with filter <%s> raw variations in VarDict ! ]' % prefix)
     if flt:
         # filter variations
-        filter_cmd = r'''perl -e 'map{chomp; if($_=~/^#/){print $_."\n";} elsif($_ =~/<dup-/){} else''' \
-                     r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
-                     r'''{ print $_."\n"}}}`cat %s`' | java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
-                     r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" | ''' \
-                     r'''bgzip -c -f -@ %d > %s''' % (raw_vcf, script_path, thread, final_vcf)
+        # filter_cmd = r'''perl -e 'map{chomp; if($_=~/^#/){print $_."\n";} elsif($_ =~/<dup-/){} else''' \
+        #              r'''{$_=~/(.*)TYPE=(\w+);/;if(($2 eq "SNV") || ($2 eq "Insertion") || ($2 eq "Deletion"))''' \
+        #              r'''{ print $_."\n"}}}`cat %s`' | java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
+        #              r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" | ''' \
+        #              r'''bgzip -c -f -@ %d > %s''' % (raw_vcf, script_path, thread, final_vcf)
+        filter_cmd = r'''java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) ''' \
+                     r'''& (DP > 6) & (VD > 4) & (MQ >= 40) & ((FILTER='PASS')|(FILTER='InDelLikely'))" %s | ''' \
+                     r'''bgzip -c -f -@ %d > %s''' % (script_path, sort_var_vcf, thread, final_vcf)
         execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in VarDict ! ]' % prefix,
                        '[ Error : Something wrong with filter <%s> raw variations in VarDict ! ]' % prefix)
     else:
-        final_vcf = raw_vcf
+        final_vcf = sort_var_vcf
     # 建立索引
     index_cmd = 'tabix %s' % final_vcf
     execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in VarDict ! ]' % prefix,
@@ -324,7 +333,7 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
         bed_cmd = '-T %s' % bed
     else:
         bed_cmd = ''
-    raw_vcf = '%s/%s.bcftools.raw.vcf' % (tmp_dir, prefix)
+    raw_vcf = '%s/%s.bcftools.raw.vcf.gz' % (tmp_dir, prefix)
     final_vcf = '%s/%s.bcftools.flt.vcf.gz' % (out_dir, prefix)
     # call snvs/indels
     call_cmd = 'bcftools mpileup --threads {} {} -Ou -f {} {} | bcftools call --threads {} -mv -Oz -o {}'.format(
@@ -335,7 +344,7 @@ def bcftools(bam, out_dir, tmp_dir, report_dir, reference, prefix, thread, scrip
         # filter
         filter_cmd = 'bcftools filter -s FILTER -g 10 -G 10 -i "%QUAL>20 && DP>6 && MQ>=40 && (DP4[2]+DP4[3])>4" ' + \
                      '--threads %d -Ov %s | awk -F"\t" \'{if($1~/#/){print}else if($7~/PASS/){print}}\' | ' \
-                     'bgzip > %s' % (thread, raw_vcf, final_vcf)
+                     'bgzip -c -f -@ %d > %s' % (thread, raw_vcf, thread, final_vcf)
         execute_system(filter_cmd, '[ Msg: <%s> filter snvs/indels done in bcftools ! ]' % prefix,
                        '[ Error: Something wrong with filter <%s> raw variations in bcftools ! ]' % prefix)
     else:

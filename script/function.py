@@ -274,7 +274,7 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
                            0.01, noqc)
     elif caller == 'strelka2':
         vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc)
-    elif caller == 'deepvariants':
+    elif caller == 'deepvariant':
         vcf_file = deep_variant_single(bam, out_dir, config['reference'], bed, vcf_rep_dir, script_path, prefix, thread,
                                        noqc, version="1.2.0")
     elif caller == 'bcftools':
