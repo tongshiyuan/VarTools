@@ -69,7 +69,7 @@ def gatk_pre(bam, out_dir, tmp_dir, reference, prefix, gatk_bundle_dir, script_p
 
 
 def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path, prefix, bed, tmp_dir, keep_tmp,
-         nqc=False):
+         nqc=False, flt=True):
     merged_gvcf = '%s/%scohort.g.vcf.gz' % (out_dir, prefix)
     cohort_vcf = '%s/%scohort.raw.vcf.gz' % (out_dir, prefix)
     excesshet = '%s/%scohort_excesshet.vcf.gz' % (tmp_dir, prefix)
@@ -98,104 +98,109 @@ def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path
         tmp_dir, reference, merged_gvcf, cohort_vcf)
     execute_system(gt_cmd, '[ Msg: Genotype GVCFs done ! ]',
                    '[ Error: Something wrong with genotype GVCFs ! ]')
-    # VariantFiltration
-    filtration_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
-                                   '--tmp-dir %s -V %s --filter-expression "ExcessHet > 54.69" ' \
-                                   '--filter-name ExcessHet -O %s' % (tmp_dir, cohort_vcf, excesshet)
-    execute_system(filtration_cmd, '[ Msg: Cohort VCF variantFiltration done ! ]',
-                   '[ Error: Something wrong with cohort VCF variantFiltration ! ]')
-    # MakeSitesOnly
-    sites_only_cmd = script_path + '/bin/gatk/gatk MakeSitesOnlyVcf --tmp-dir %s -I %s -O %s' % (
-        tmp_dir, excesshet, sitesonly)
-    execute_system(sites_only_cmd, '[ Msg: Make sites only vcf done ! ]',
-                   '[ Error: Something wrong with make sites only vcf ! ]')
-    # VariantRecalibrator
-    if os.path.basename(reference).find('hg19') != -1:
-        _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
-                '%s/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz ' % gatk_bundle_dir
-        _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
-                 '%s/dbsnp_138.hg19.vcf.gz' % gatk_bundle_dir
-        _dbsnp2 = '%s/dbsnp_138.hg19.vcf.gz' % gatk_bundle_dir
-        _hapmap = '%s/hapmap_3.3.hg19.sites.vcf.gz' % gatk_bundle_dir
-        _omni = '%s/1000G_omni2.5.hg19.sites.vcf.gz' % gatk_bundle_dir
-        _1kg = '%s/1000G_phase1.snps.high_confidence.hg19.sites.vcf.gz' % gatk_bundle_dir
-        indel_db = _mill + _dbsnp
-    elif os.path.basename(reference).find('v37') != -1:
-        _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
-                '%s/Mills_and_1000G_gold_standard.indels.b37.vcf.gz' % gatk_bundle_dir
-        _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
-                 '%s/dbsnp_138.b37.vcf.gz' % gatk_bundle_dir
-        _dbsnp2 = '%s/dbsnp_138.b37.vcf.gz' % gatk_bundle_dir
-        _hapmap = '%s/hapmap_3.3.b37.vcf.gz' % gatk_bundle_dir
-        _omni = '%s/1000G_omni2.5.b37.vcf.gz' % gatk_bundle_dir
-        _1kg = '%s/1000G_phase1.snps.high_confidence.b37.vcf.gz' % gatk_bundle_dir
-        indel_db = _mill + _dbsnp
-    elif os.path.basename(reference).find('38') != -1:
-        _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
-                '%s/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz ' % gatk_bundle_dir
-        _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
-                 '%s/dbsnp_146.hg38.vcf.gz' % gatk_bundle_dir
-        _axiom = '-resource:axiomPoly,known=false,training=true,truth=false,prior=10 ' \
-                 '%s/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz ' % gatk_bundle_dir
-        _dbsnp2 = '%s/dbsnp_146.hg38.vcf.gz' % gatk_bundle_dir
-        _hapmap = '%s/hapmap_3.3.hg38.vcf.gz' % gatk_bundle_dir
-        _omni = '%s/1000G_omni2.5.hg38.vcf.gz' % gatk_bundle_dir
-        _1kg = '%s/1000G_phase1.snps.high_confidence.hg38.vcf.gz' % gatk_bundle_dir
-        indel_db = _mill + _axiom + _dbsnp
+    if flt:
+        # VariantFiltration
+        filtration_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
+                                       '--tmp-dir %s -V %s --filter-expression "ExcessHet > 54.69" ' \
+                                       '--filter-name ExcessHet -O %s' % (tmp_dir, cohort_vcf, excesshet)
+        execute_system(filtration_cmd, '[ Msg: Cohort VCF variantFiltration done ! ]',
+                       '[ Error: Something wrong with cohort VCF variantFiltration ! ]')
+        # MakeSitesOnly
+        sites_only_cmd = script_path + '/bin/gatk/gatk MakeSitesOnlyVcf --tmp-dir %s -I %s -O %s' % (
+            tmp_dir, excesshet, sitesonly)
+        execute_system(sites_only_cmd, '[ Msg: Make sites only vcf done ! ]',
+                       '[ Error: Something wrong with make sites only vcf ! ]')
+        # VariantRecalibrator
+        if os.path.basename(reference).find('hg19') != -1:
+            _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
+                    '%s/Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz ' % gatk_bundle_dir
+            _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
+                     '%s/dbsnp_138.hg19.vcf.gz' % gatk_bundle_dir
+            _dbsnp2 = '%s/dbsnp_138.hg19.vcf.gz' % gatk_bundle_dir
+            _hapmap = '%s/hapmap_3.3.hg19.sites.vcf.gz' % gatk_bundle_dir
+            _omni = '%s/1000G_omni2.5.hg19.sites.vcf.gz' % gatk_bundle_dir
+            _1kg = '%s/1000G_phase1.snps.high_confidence.hg19.sites.vcf.gz' % gatk_bundle_dir
+            indel_db = _mill + _dbsnp
+        elif os.path.basename(reference).find('v37') != -1:
+            _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
+                    '%s/Mills_and_1000G_gold_standard.indels.b37.vcf.gz' % gatk_bundle_dir
+            _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
+                     '%s/dbsnp_138.b37.vcf.gz' % gatk_bundle_dir
+            _dbsnp2 = '%s/dbsnp_138.b37.vcf.gz' % gatk_bundle_dir
+            _hapmap = '%s/hapmap_3.3.b37.vcf.gz' % gatk_bundle_dir
+            _omni = '%s/1000G_omni2.5.b37.vcf.gz' % gatk_bundle_dir
+            _1kg = '%s/1000G_phase1.snps.high_confidence.b37.vcf.gz' % gatk_bundle_dir
+            indel_db = _mill + _dbsnp
+        elif os.path.basename(reference).find('38') != -1:
+            _mill = '-resource:mills,known=false,training=true,truth=true,prior=12 ' \
+                    '%s/Mills_and_1000G_gold_standard.indels.hg38.vcf.gz ' % gatk_bundle_dir
+            _dbsnp = '-resource:dbsnp,known=true,training=false,truth=false,prior=2 ' \
+                     '%s/dbsnp_146.hg38.vcf.gz' % gatk_bundle_dir
+            _axiom = '-resource:axiomPoly,known=false,training=true,truth=false,prior=10 ' \
+                     '%s/Axiom_Exome_Plus.genotypes.all_populations.poly.hg38.vcf.gz ' % gatk_bundle_dir
+            _dbsnp2 = '%s/dbsnp_146.hg38.vcf.gz' % gatk_bundle_dir
+            _hapmap = '%s/hapmap_3.3.hg38.vcf.gz' % gatk_bundle_dir
+            _omni = '%s/1000G_omni2.5.hg38.vcf.gz' % gatk_bundle_dir
+            _1kg = '%s/1000G_phase1.snps.high_confidence.hg38.vcf.gz' % gatk_bundle_dir
+            indel_db = _mill + _axiom + _dbsnp
+        else:
+            sys.exit('[ Error: Can not find bundle file with <%s>]' % os.path.basename(reference))
+        recalibrator_cmd = script_path + '/bin/gatk/gatk VariantRecalibrator -V %s --trust-all-polymorphic ' \
+                                         '-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.5 -tranche 99.0 ' \
+                                         '-tranche 97.0 -tranche 96.0 -tranche 95.0 -tranche 94.0 -tranche 93.5 ' \
+                                         '-tranche 93.0 -tranche 92.0 -tranche 91.0 -tranche 90.0 ' \
+                                         '-an FS -an ReadPosRankSum -an MQRankSum -an QD -an SOR -an DP -mode INDEL ' \
+                                         '--max-gaussians 4 %s -O %s --tranches-file %s' % (
+                               sitesonly, indel_db, indels_recal, indels_tranches)
+        execute_system(recalibrator_cmd, '[ Msg: Indel recalibrator done ! ]',
+                       '[ Error: Something wrong with indel recalibrator ! ]')
+        apply_vqsr_cmd = script_path + '/bin/gatk/gatk ApplyVQSR -V %s --recal-file %s --tranches-file %s ' \
+                                       '--truth-sensitivity-filter-level 99.7 --create-output-variant-index true ' \
+                                       '-mode INDEL -O %s' % (excesshet, indels_recal, indels_tranches, indels_vcf)
+        execute_system(apply_vqsr_cmd, '[ Msg: Indel apply VQSR done ! ]',
+                       '[ Error: Something wrong with indel apply VQSR ! ]')
+        recalibrator_cmd = script_path + '/bin/gatk/gatk VariantRecalibrator -V %s --trust-all-polymorphic ' \
+                                         '-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 ' \
+                                         '-tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 ' \
+                                         '-tranche 97.0 -tranche 90.0 ' \
+                                         '-an QD -an MQRankSum -an ReadPosRankSum ' \
+                                         '-an FS -an MQ -an SOR -an DP -mode SNP ' \
+                                         '--max-gaussians 6 ' \
+                                         '-resource:hapmap,known=false,training=true,truth=true,prior=15 %s ' \
+                                         '-resource:omni,known=false,training=true,truth=true,prior=12 %s ' \
+                                         '-resource:1000G,known=false,training=true,truth=false,prior=10 %s ' \
+                                         '-resource:dbsnp,known=true,training=false,truth=false,prior=7 %s ' \
+                                         '-O %s --tranches-file %s' % (
+                               sitesonly, _hapmap, _omni, _1kg, _dbsnp2, snp_recal, snp_tranches)
+        execute_system(recalibrator_cmd, '[ Msg: Snp recalibrator done ! ]',
+                       '[ Error: Something wrong with snp recalibrator ! ]')
+        filter_cmd = script_path + '/bin/gatk/gatk ApplyVQSR -V %s --recal-file %s --tranches-file %s ' \
+                                   '--truth-sensitivity-filter-level 99.7 ' \
+                                   '--create-output-variant-index true -mode SNP -O %s' % (
+                         indels_vcf, snp_recal, snp_tranches, final_vcf)
+        execute_system(filter_cmd, '[ Msg: snps recalibrated done ! ]',
+                       '[ Error: Something wrong with snps recalibrated ! ]')
+        # 建立索引
+        # index_cmd = 'bcftools index -t %s' % final_vcf
+        # execute_system(index_cmd, '[ Msg: Build vcf index done in gatk ! ]',
+        #                '[ E: Something wrong with build vcf index file in gatk ! ]')
+        # 删除无用中间文件
+        if not keep_tmp:
+            rm_cmd = 'rm -f %s %s %s %s %s %s %s %s' % (
+                sitesonly, excesshet, merged_gvcf, indels_tranches, indels_recal, indels_vcf, snp_recal,
+                snp_tranches)
+            execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
+                           '[ Error: Something wrong with delete process file in gatk ! ]')
     else:
-        sys.exit('[ Error: Can not find bundle file with <%s>]' % os.path.basename(reference))
-    recalibrator_cmd = script_path + '/bin/gatk/gatk VariantRecalibrator -V %s --trust-all-polymorphic ' \
-                                     '-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.5 -tranche 99.0 ' \
-                                     '-tranche 97.0 -tranche 96.0 -tranche 95.0 -tranche 94.0 -tranche 93.5 ' \
-                                     '-tranche 93.0 -tranche 92.0 -tranche 91.0 -tranche 90.0 ' \
-                                     '-an FS -an ReadPosRankSum -an MQRankSum -an QD -an SOR -an DP -mode INDEL ' \
-                                     '--max-gaussians 4 %s -O %s --tranches-file %s' % (
-                           sitesonly, indel_db, indels_recal, indels_tranches)
-    execute_system(recalibrator_cmd, '[ Msg: Indel recalibrator done ! ]',
-                   '[ Error: Something wrong with indel recalibrator ! ]')
-    apply_vqsr_cmd = script_path + '/bin/gatk/gatk ApplyVQSR -V %s --recal-file %s --tranches-file %s ' \
-                                   '--truth-sensitivity-filter-level 99.7 --create-output-variant-index true ' \
-                                   '-mode INDEL -O %s' % (excesshet, indels_recal, indels_tranches, indels_vcf)
-    execute_system(apply_vqsr_cmd, '[ Msg: Indel apply VQSR done ! ]',
-                   '[ Error: Something wrong with indel apply VQSR ! ]')
-    recalibrator_cmd = script_path + '/bin/gatk/gatk VariantRecalibrator -V %s --trust-all-polymorphic ' \
-                                     '-tranche 100.0 -tranche 99.95 -tranche 99.9 -tranche 99.8 -tranche 99.6 ' \
-                                     '-tranche 99.5 -tranche 99.4 -tranche 99.3 -tranche 99.0 -tranche 98.0 ' \
-                                     '-tranche 97.0 -tranche 90.0 ' \
-                                     '-an QD -an MQRankSum -an ReadPosRankSum -an FS -an MQ -an SOR -an DP -mode SNP ' \
-                                     '--max-gaussians 6 ' \
-                                     '-resource:hapmap,known=false,training=true,truth=true,prior=15 %s ' \
-                                     '-resource:omni,known=false,training=true,truth=true,prior=12 %s ' \
-                                     '-resource:1000G,known=false,training=true,truth=false,prior=10 %s ' \
-                                     '-resource:dbsnp,known=true,training=false,truth=false,prior=7 %s ' \
-                                     '-O %s --tranches-file %s' % (
-                           sitesonly, _hapmap, _omni, _1kg, _dbsnp2, snp_recal, snp_tranches)
-    execute_system(recalibrator_cmd, '[ Msg: Snp recalibrator done ! ]',
-                   '[ Error: Something wrong with snp recalibrator ! ]')
-    filter_cmd = script_path + '/bin/gatk/gatk ApplyVQSR -V %s --recal-file %s --tranches-file %s ' \
-                               '--truth-sensitivity-filter-level 99.7 ' \
-                               '--create-output-variant-index true -mode SNP -O %s' % (
-                     indels_vcf, snp_recal, snp_tranches, final_vcf)
-    execute_system(filter_cmd, '[ Msg: snps recalibrated done ! ]',
-                   '[ Error: Something wrong with snps recalibrated ! ]')
-    # 建立索引
-    # index_cmd = 'bcftools index -t %s' % final_vcf
-    # execute_system(index_cmd, '[ Msg: Build vcf index done in gatk ! ]',
-    #                '[ E: Something wrong with build vcf index file in gatk ! ]')
-    # 删除无用中间文件
-    if not keep_tmp:
-        rm_cmd = 'rm -f %s %s %s %s %s %s %s %s' % (
-            sitesonly, excesshet, merged_gvcf, indels_tranches, indels_recal, indels_vcf, snp_recal,
-            snp_tranches)
-        execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
-                       '[ Error: Something wrong with delete process file in gatk ! ]')
+        final_vcf = cohort_vcf
     # vcf stats
     if not nqc:
         vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
 
 
-def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, script_path, bed, keep_tmp, nqc=False):
+def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, script_path, bed, keep_tmp, nqc=False,
+                     flt=True):
     raw_vcf = '%s/%s.gatk.raw.vcf.gz' % (out_dir, prefix)
     snv_vcf = '%s/%s.gatk.snvs.vcf.gz' % (tmp_dir, prefix)
     snv_filted_vcf = '%s/%s.gatk.snvs.filtered.vcf.gz' % (tmp_dir, prefix)
@@ -207,37 +212,42 @@ def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, scr
     if bed:
         gt_cmd += '-L %s' % bed
     execute_system(gt_cmd, '[ Msg: Genotype GVCF done ! ]', '[ Error: Something wrong with genotype GVCF ! ]')
-    # select
-    select_snv_cmd = script_path + '/bin/gatk/gatk SelectVariants -V %s -select-type SNP -O %s' % (raw_vcf, snv_vcf)
-    execute_system(select_snv_cmd, '[ Msg: select SNV done ! ]', '[ Error: Something wrong with select SNV ! ]')
-    select_indel_cmd = script_path + '/bin/gatk/gatk SelectVariants -V %s -select-type INDEL -O %s' % (
-        raw_vcf, indel_vcf)
-    execute_system(select_indel_cmd, '[ Msg: select INDEL done ! ]', '[ Error: Something wrong with select INDEL ! ]')
-    # filter
-    snv_filter_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
-                                   '-filter "QD < 2.0" --filter-name "QD2" ' \
-                                   '-filter "QUAL < 30.0" --filter-name "QUAL30" ' \
-                                   '-filter "SOR > 3.0" --filter-name "SOR3" ' \
-                                   '-filter "FS > 60.0" --filter-name "FS60" ' \
-                                   '-filter "MQ < 40.0" --filter-name "MQ40" ' \
-                                   '-filter "MQRankSum < -12.5" --filter-name "MQRankSum-12.5" ' \
-                                   '-filter "ReadPosRankSum < -8.0" --filter-name "ReadPosRankSum-8" ' \
-                                   '-V %s -O %s' % (snv_vcf, snv_filted_vcf)
-    execute_system(snv_filter_cmd, '[ Msg: SNV filtered done ! ]', '[ Error: Something wrong with filter SNV ! ]')
-    indel_filter_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
-                                     '-filter "QD < 2.0" --filter-name "QD2"  ' \
-                                     '-filter "QUAL < 30.0" --filter-name "QUAL30" ' \
-                                     '-filter "FS > 200.0" --filter-name "FS200" ' \
-                                     '-filter "ReadPosRankSum < -20.0" --filter-name "ReadPosRankSum-20" ' \
-                                     '-V %s -O %s' % (indel_vcf, indel_filted_vcf)
-    execute_system(indel_filter_cmd, '[ Msg: INDEL filtered done ! ]', '[ Error: Something wrong with filter INDEL ! ]')
-    merge_cmd = script_path + '/bin/gatk/gatk MergeVcfs -I %s -I %s -O %s' % (snv_filted_vcf, indel_filted_vcf, vcf)
-    execute_system(merge_cmd, '[ Msg: merge filtered vcf done ! ]',
-                   '[ Error: Something wrong with merge filtered vcf ! ]')
-    if not keep_tmp:
-        rm_cmd = 'rm -f %s* %s* %s* %s* ' % (snv_vcf, snv_filted_vcf, indel_vcf, indel_filted_vcf)
-        execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
-                       '[ Error: Something wrong with delete process file in gatk ! ]')
+    if flt:
+        # select
+        select_snv_cmd = script_path + '/bin/gatk/gatk SelectVariants -V %s -select-type SNP -O %s' % (raw_vcf, snv_vcf)
+        execute_system(select_snv_cmd, '[ Msg: select SNV done ! ]', '[ Error: Something wrong with select SNV ! ]')
+        select_indel_cmd = script_path + '/bin/gatk/gatk SelectVariants -V %s -select-type INDEL -O %s' % (
+            raw_vcf, indel_vcf)
+        execute_system(select_indel_cmd, '[ Msg: select INDEL done ! ]',
+                       '[ Error: Something wrong with select INDEL ! ]')
+        # filter
+        snv_filter_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
+                                       '-filter "QD < 2.0" --filter-name "QD2" ' \
+                                       '-filter "QUAL < 30.0" --filter-name "QUAL30" ' \
+                                       '-filter "SOR > 3.0" --filter-name "SOR3" ' \
+                                       '-filter "FS > 60.0" --filter-name "FS60" ' \
+                                       '-filter "MQ < 40.0" --filter-name "MQ40" ' \
+                                       '-filter "MQRankSum < -12.5" --filter-name "MQRankSum-12.5" ' \
+                                       '-filter "ReadPosRankSum < -8.0" --filter-name "ReadPosRankSum-8" ' \
+                                       '-V %s -O %s' % (snv_vcf, snv_filted_vcf)
+        execute_system(snv_filter_cmd, '[ Msg: SNV filtered done ! ]', '[ Error: Something wrong with filter SNV ! ]')
+        indel_filter_cmd = script_path + '/bin/gatk/gatk VariantFiltration ' \
+                                         '-filter "QD < 2.0" --filter-name "QD2"  ' \
+                                         '-filter "QUAL < 30.0" --filter-name "QUAL30" ' \
+                                         '-filter "FS > 200.0" --filter-name "FS200" ' \
+                                         '-filter "ReadPosRankSum < -20.0" --filter-name "ReadPosRankSum-20" ' \
+                                         '-V %s -O %s' % (indel_vcf, indel_filted_vcf)
+        execute_system(indel_filter_cmd, '[ Msg: INDEL filtered done ! ]',
+                       '[ Error: Something wrong with filter INDEL ! ]')
+        merge_cmd = script_path + '/bin/gatk/gatk MergeVcfs -I %s -I %s -O %s' % (snv_filted_vcf, indel_filted_vcf, vcf)
+        execute_system(merge_cmd, '[ Msg: merge filtered vcf done ! ]',
+                       '[ Error: Something wrong with merge filtered vcf ! ]')
+        if not keep_tmp:
+            rm_cmd = 'rm -f %s* %s* %s* %s* ' % (snv_vcf, snv_filted_vcf, indel_vcf, indel_filted_vcf)
+            execute_system(rm_cmd, '[ Msg: Delete process file done in gatk! ]',
+                           '[ Error: Something wrong with delete process file in gatk ! ]')
+    else:
+        vcf = raw_vcf
     # vcf stats
     if not nqc:
         vcf_stats(vcf, report_dir, reference, script_path)

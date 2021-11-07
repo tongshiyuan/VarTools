@@ -250,7 +250,8 @@ def trio_analysis():
     # print('[ Msg: All sample gatk calling done ! ]')
 
 
-def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, config_file, script_path, noqc):
+def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, config_file, script_path, noqc, noflt):
+    flt = not noflt
     config = read_config(script_path, config_file)
     out_dir = os.path.abspath(out_dir)
     if not tmp_dir:
@@ -263,22 +264,23 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
         gvcf = gatk_pre(bam, out_dir, tmp_dir,
                         config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
         vcf_file = gatk([gvcf], out_dir, vcf_rep_dir, config['reference'], config['gatk_bundle'], script_path, prefix,
-                        bed, tmp_dir, keep_tmp, noqc)
+                        bed, tmp_dir, keep_tmp, noqc, flt)
     elif caller == 'gatk_hard':
         gvcf = gatk_pre(bam, out_dir, tmp_dir,
                         config['reference'], prefix, config['gatk_bundle'], script_path, bed, keep_tmp)
         vcf_file = gatk_hard_filter(gvcf, out_dir, vcf_rep_dir, tmp_dir, prefix, config['reference'], script_path, bed,
-                                    keep_tmp, noqc)
+                                    keep_tmp, noqc, flt)
     elif caller == 'vardict':
         vcf_file = vardict(bam, out_dir, config['reference'], bed, vcf_rep_dir, tmp_dir, script_path, prefix, thread,
-                           0.01, noqc)
+                           0.01, noqc, flt)
     elif caller == 'strelka2':
-        vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc)
+        vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc,
+                           flt)
     elif caller == 'deepvariant':
         vcf_file = deep_variant_single(bam, out_dir, config['reference'], bed, vcf_rep_dir, script_path, prefix, thread,
-                                       noqc, version="1.2.0")
+                                       noqc, flt, version="1.2.0")
     elif caller == 'bcftools':
         vcf_file = bcftools(bam, out_dir, tmp_dir, vcf_rep_dir, config['reference'], prefix, thread, script_path, bed,
-                            noqc)
+                            noqc, flt)
     else:
         sys.exit('[Error: Can not identify caller <%s>. ]' % caller)

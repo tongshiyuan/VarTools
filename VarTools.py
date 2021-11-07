@@ -198,6 +198,7 @@ def call_args(args):
     argsd['config'] = args.config
     argsd['caller'] = args.caller
     argsd['novcfqc'] = args.noqc
+    argsd['noflt'] = args.noflt
     return argsd
 
 
@@ -384,8 +385,9 @@ function of VarTools:
                             help='temp directory, if not, it will create in the result directory.')
         parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
         parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
-        parser.add_argument('--noqc', action='store_true', help='keep temp directory.')
+        parser.add_argument('--noqc', action='store_true', help='do not vcf quality check.')
         parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('--noflt', action='store_true', help='do not filter raw vcf by base line.')
         args = parser.parse_args()
         args_dict = call_args(args)
     else:
@@ -441,7 +443,8 @@ def main():
         pass
     elif args['fun'] == 'call':
         variants_call(args['bam'], args['out_dir'], args['caller'], args['bed'], args['prefix'], args['thread'],
-                      args['tmp_dir'], args['keep_tmp'], args['config'], args['script_path'], args['novcfqc'])
+                      args['tmp_dir'], args['keep_tmp'], args['config'], args['script_path'],
+                      args['novcfqc'], args['noflt'])
 
 
 if __name__ == '__main__':
