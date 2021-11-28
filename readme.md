@@ -7,7 +7,7 @@
 - pandas
 - scipy
 - java 1.8 for vardict and GATK
-- R for vardict
+- R(version>=3.6.3) for vardict
 - samtools
 
 ## funcion

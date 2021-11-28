@@ -106,7 +106,7 @@ def gatk(gvcf_list, out_dir, report_dir, reference, gatk_bundle_dir, script_path
         execute_system(filtration_cmd, '[ Msg: Cohort VCF variantFiltration done ! ]',
                        '[ Error: Something wrong with cohort VCF variantFiltration ! ]')
         # MakeSitesOnly
-        sites_only_cmd = script_path + '/bin/gatk/gatk MakeSitesOnlyVcf --tmp-dir %s -I %s -O %s' % (
+        sites_only_cmd = script_path + '/bin/gatk/gatk MakeSitesOnlyVcf --TMP_DIR %s -I %s -O %s' % (
             tmp_dir, excesshet, sitesonly)
         execute_system(sites_only_cmd, '[ Msg: Make sites only vcf done ! ]',
                        '[ Error: Something wrong with make sites only vcf ! ]')
