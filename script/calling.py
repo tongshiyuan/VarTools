@@ -254,7 +254,7 @@ def gatk_hard_filter(g_vcf, out_dir, report_dir, tmp_dir, prefix, reference, scr
     return vcf
 
 
-def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir, nqc=False, flt=True):
+def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_dir, prefix, nqc=False, flt=True):
     rst1 = check_software('bgzip')
     rst2 = check_software('tabix')
     if rst1 or rst2:
@@ -275,9 +275,16 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
     call_cmd = '%s/runWorkflow.py -m local -j %d' % (out_dir, thread)
     execute_system(call_cmd, '[ Msg: Call variants with strelka done ! ]',
                    '[ Error: Something wrong with strelka call variants ! ]')
-    final_vcf = out_dir + '/results/variants/variants.vcf.gz'
+    raw_vcf = out_dir + '/results/variants/variants.vcf.gz'
+    final_vcf = '%s/%s.strelka.flt.vcf.gz' % (out_dir, prefix)
     if flt:
-        pass
+        filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) & (GEN[0].DP > 6) & ' \
+                     '(GEN[0].GQ > 20) & (FILTER=\'PASS\')" %s | bgzip -c -f -@ %d > %s' % (
+                         script_path, raw_vcf, thread, final_vcf)
+        execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
+                       '[ Error: Something wrong with filter raw variations in DeepVariant ! ]')
+    else:
+        final_vcf = raw_vcf
     if not nqc:
         vcf_stats(final_vcf, report_dir, reference, script_path)
     return final_vcf
