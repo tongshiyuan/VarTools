@@ -119,7 +119,8 @@ def f2v(in_dir, out_dir, bed, prefix,
     elif config['caller'] == 'strelka2':
         vcf_rep_dir = out_dir + '/reports/vcfQC'
         os.makedirs(vcf_rep_dir)
-        vcf_file = strelka(bam_file, rst_out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir)
+        vcf_file = strelka(bam_file, rst_out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir,
+                           sample_name)
     elif config['caller'] == 'deepvariants':
         vcf_rep_dir = out_dir + '/reports/vcfQC'
         os.makedirs(vcf_rep_dir)
@@ -274,8 +275,8 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
         vcf_file = vardict(bam, out_dir, config['reference'], bed, vcf_rep_dir, tmp_dir, script_path, prefix, thread,
                            0.01, noqc, flt)
     elif caller == 'strelka2':
-        vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, noqc,
-                           flt)
+        vcf_file = strelka(bam, out_dir, vcf_rep_dir, config['reference'], script_path, thread, bed, tmp_dir, prefix,
+                           noqc, flt)
     elif caller == 'deepvariant':
         vcf_file = deep_variant_single(bam, out_dir, config['reference'], bed, vcf_rep_dir, script_path, prefix, thread,
                                        noqc, flt, version="1.2.0")
