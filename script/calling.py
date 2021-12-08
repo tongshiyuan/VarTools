@@ -259,6 +259,7 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
     rst2 = check_software('tabix')
     if rst1 or rst2:
         sys.exit('[ Error: Can not open <bgzip> or <tabix>.]')
+    tmp_out_dir = out_dir
     out_dir += '/strelka_workplace'
     if bed:
         compress_cmd = 'cp %s %s && bgzip %s/%s && tabix -b 2 -e 3 -p bed %s/%s.gz' % (
@@ -276,14 +277,21 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
     execute_system(call_cmd, '[ Msg: Call variants with strelka done ! ]',
                    '[ Error: Something wrong with strelka call variants ! ]')
     raw_vcf = out_dir + '/results/variants/variants.vcf.gz'
-    final_vcf = '%s/%s.strelka.flt.vcf.gz' % (out_dir, prefix)
+    final_vcf = '%s/%s.strelka.flt.vcf.gz' % (tmp_out_dir, prefix)
     if flt:
         filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) & (GEN[0].DP > 6) & ' \
                      '(GEN[0].GQ > 20) & (FILTER=\'PASS\')" %s | bgzip -c -f -@ %d > %s' % (
                          script_path, raw_vcf, thread, final_vcf)
-        execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in DeepVariant ! ]',
-                       '[ Error: Something wrong with filter raw variations in DeepVariant ! ]')
+        execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in Strelka2 ! ]',
+                       '[ Error: Something wrong with filter raw variations in Strelka2 ! ]')
+        # 建立索引
+        index_cmd = 'tabix %s' % final_vcf
+        execute_system(index_cmd, '[ Msg: Build <%s> vcf file index done in Strelka2 ! ]' % prefix,
+                       '[ Error: Something wrong with build <%s> vcf index file in Strelka2 ! ]' % prefix)
     else:
+        mv_cmd = 'mv %s %s && mv %s.tbi %s.tbi' % (raw_vcf, final_vcf, raw_vcf, final_vcf)
+        execute_system(mv_cmd, '[ Msg: Move snvs/indels done in Strelka2 ! ]',
+                       '[ Error: Something wrong with move raw variations in Strelka2 ! ]')
         final_vcf = raw_vcf
     if not nqc:
         vcf_stats(final_vcf, report_dir, reference, script_path)
