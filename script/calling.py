@@ -279,8 +279,8 @@ def strelka(bam, out_dir, report_dir, reference, script_path, thread, bed, tmp_d
     raw_vcf = out_dir + '/results/variants/variants.vcf.gz'
     final_vcf = '%s/%s.strelka.flt.vcf.gz' % (tmp_out_dir, prefix)
     if flt:
-        filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) & (GEN[0].DP > 6) & ' \
-                     '(GEN[0].GQ > 20) & (FILTER=\'PASS\')" %s | bgzip -c -f -@ %d > %s' % (
+        filter_cmd = 'java -jar %s/bin/snpEff/SnpSift.jar filter "(QUAL >= 20) & ((GEN[0].DP > 6) | (GEN[0].DPI > 6))' \
+                     ' & (GEN[0].GQ > 20) & (FILTER=\'PASS\')" %s | bgzip -c -f -@ %d > %s' % (
                          script_path, raw_vcf, thread, final_vcf)
         execute_system(filter_cmd, '[ Msg: Filter snvs/indels done in Strelka2 ! ]',
                        '[ Error: Something wrong with filter raw variations in Strelka2 ! ]')
