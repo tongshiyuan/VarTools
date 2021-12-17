@@ -167,6 +167,10 @@ def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, out_dir, script_path, config_file, 
 def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config_file, caller='gatk_hard', noqc=False,
               noflt=False):
     flt = not noflt
+    if not tmp_dir:
+        tmp_dir = '%s/tmp_dir' % out_dir
+    if not os.path.isdir(tmp_dir):
+        os.makedirs(tmp_dir)
     config = read_config(script_path, config_file)
     out_dir = os.path.abspath(out_dir)  # + '/result'
     report_dir = out_dir + '/vcfQC'
