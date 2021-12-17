@@ -124,6 +124,9 @@ def sGT_args(args):
     argsd['keep_tmp'] = args.keep_tmp
     argsd['prefix'] = args.prefix
     argsd['config'] = args.config
+    argsd['caller'] = args.caller
+    argsd['novcfqc'] = args.noqc
+    argsd['noflt'] = args.noflt
     return argsd
 
 
@@ -319,11 +322,14 @@ function of VarTools:
         parser.add_argument('-g', '--gvcf', required=True, help='directory of proband raw data.')
         parser.add_argument('-o', '--out_dir', default='./result', help='output directory of result, [./result].')
         parser.add_argument('-b', '--bed', default=False, help='regions of interest.')
-        parser.add_argument('--prefix', default='', help='prefix of output file.[].')
+        parser.add_argument('-c', '--caller', default='gatk_hard', help='caller gatk_hard/vqsr, [gatk_hard].')
+        parser.add_argument('-p', '--prefix', default='', help='prefix of output file.[].')
         parser.add_argument('--tmp_dir', default=False,
                             help='temp directory, if not, it will create in the result directory.')
         parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
         parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        parser.add_argument('--noqc', action='store_true', help='do not vcf quality check.')
+        parser.add_argument('--noflt', action='store_true', help='do not filter raw vcf by base line.')
         args = parser.parse_args()
         args_dict = sGT_args(args)
     elif sys.argv[1] == 'fp':
@@ -419,7 +425,7 @@ def main():
 
     elif args['fun'] == 'sGT':
         single_gt(args['gvcf'], args['out_dir'], args['script_path'], args['bed'], args['tmp_dir'], args['keep_tmp'],
-                  args['prefix'], args['config'])
+                  args['prefix'], args['config'], args['caller'], args['novcfqc'], args['noflt'])
 
     elif args['fun'] == 'fp':
         rm_tmp = False

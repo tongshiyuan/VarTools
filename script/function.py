@@ -164,12 +164,21 @@ def trio_gt(p_gvcf, f_gvcf, m_gvcf, s_gvcfs, out_dir, script_path, config_file, 
     affinity(vcf, aff_dir, script_path)
 
 
-def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config_file):
+def single_gt(gvcf, out_dir, script_path, bed, tmp_dir, keep_tmp, prefix, config_file, caller='gatk_hard', noqc=False,
+              noflt=False):
+    flt = not noflt
     config = read_config(script_path, config_file)
     out_dir = os.path.abspath(out_dir)  # + '/result'
     report_dir = out_dir + '/vcfQC'
     os.makedirs(report_dir)
-    vcf = gatk_hard_filter(gvcf, out_dir, report_dir, tmp_dir, prefix, config['reference'], script_path, bed, keep_tmp)
+    if caller == 'gatk_hard':
+        vcf = gatk_hard_filter(gvcf, out_dir, report_dir, tmp_dir, prefix, config['reference'], script_path, bed,
+                               keep_tmp)
+    elif caller == 'vqsr':
+        vcf = gatk([gvcf], out_dir, report_dir, config['reference'], config['gatk_bundle'], script_path, prefix,
+                   bed, tmp_dir, keep_tmp, noqc, flt)
+    else:
+        sys.exit('[Error: Can not identify caller <%s>. ]' % caller)
 
 
 def burden_test(case, control, case_matrix, control_matrix,

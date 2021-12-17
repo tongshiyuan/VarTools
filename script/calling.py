@@ -416,7 +416,7 @@ def deep_variant_single(bam, out_dir, reference, bed, report_dir, script_path, p
             sys.exit('[ Error: Can not open <Singularity>.]')
         else:
             if not os.path.isfile('%s/bin/deepvariant_latest.sif' % script_path):
-                pull_cmd = 'singularity pull docker:google/deepvariant && ' \
+                pull_cmd = 'singularity pull docker://google/deepvariant && ' \
                            'mv deepvariant_latest.sif %s/bin/' % script_path
                 execute_system(pull_cmd, '[ Msg: pull deepvariant image done ! ]' % prefix,
                                '[ Error: Can not pull deepvariant image ! ]' % prefix)

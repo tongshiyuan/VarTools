@@ -17,8 +17,8 @@ def execute_system(cmd, done_notice='', fail_notice=''):
 
 def check_software(soft):
     # 检查软件是否存在，不存在就退出
-    cmd = 'command -v %s >/dev/null 2>&1 || { echo >&2 "[ E: VarTools require %s install it and add to system path. ' \
-          'Aborting. ] "; exit 1; }' % (soft, soft)
+    cmd = 'command -v %s >/dev/null 2>&1 || { echo >&2 "[ Error: VarTools require %s install it ' \
+          'and add to system path. Aborting. ] "; exit 1; }' % (soft, soft)
     # type foo >/dev/null 2>&1 || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; }
     # hash foo 2>/dev/null || { echo >&2 "I require foo but it's not installed.  Aborting."; exit 1; }
     # execute_system(cmd)
