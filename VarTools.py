@@ -18,7 +18,7 @@ import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify, variants_call
+from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify, variants_call, anno_variants
 from script.case_control import build_snvdb
 
 
@@ -205,6 +205,24 @@ def call_args(args):
     return argsd
 
 
+def anno_args(args):
+    argsd = {}
+    if not args.invcf:
+        sys.exit('[ Error: Args incomplete ! ]')
+    else:
+        argsd['vcf'] = os.path.realpath(args.invcf)
+    argsd['out_dir'] = args.out_dir
+    argsd['thread'] = args.thread
+    argsd['keep_tmp'] = args.keep_tmp
+    if args.prefix:
+        argsd['prefix'] = args.prefix
+    else:
+        argsd['prefix'] = os.path.basename(argsd['vcf']).split('.vcf')[0]
+    argsd['config'] = args.config
+    argsd['mode'] = args.mode
+    return argsd
+
+
 def ana_args():
     description = '=' * 77 + '\nVarTools 0.1.0 20211011\nWorkflow of WGS/WES analysis.\n' + '=' * 77
     print(description)
@@ -226,6 +244,7 @@ function of VarTools:
     (12) sA: single case analysis.
     (13) bt: Burden testing with TRAPD.
     -----------
+    (14) anno: annotation for small variants.
     To get help on a particular command, call it with -h/--help.
     '''
     function = {
@@ -241,7 +260,8 @@ function of VarTools:
         'sA': 'single case analysis.',
         'tA': 'trio analysis.',
         'gd': 'identify gender from bam coverage.',
-        'call': 'call variants from bam'
+        'call': 'call variants from bam.',
+        'anno': 'annotation for small variants.'
     }
 
     if len(sys.argv) == 1 or sys.argv[1] in ['--help', 'help', '-h']:
@@ -396,6 +416,20 @@ function of VarTools:
         parser.add_argument('--noflt', action='store_true', help='do not filter raw vcf by base line.')
         args = parser.parse_args()
         args_dict = call_args(args)
+    elif sys.argv[1] == 'anno':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s anno [options] -i VCF')
+        parser.description = function['anno']
+        parser.add_argument('-i', '--invcf', required=True, help='input vcf file.')
+        parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
+        parser.add_argument('-p', '--prefix', default=False,
+                            help='prefix of output file, if not, will use input vcf name.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('-m', '--mode', default='FA', choices=['FA', 'TA'],
+                            help='two mode TA/FA, TA: annotate all info, FA: filter with annotation,[FA].')
+        args = parser.parse_args()
+        args_dict = anno_args(args)
     else:
         sys.exit('[ Error: Can not identify the function of <%s>]' % sys.argv[1])
 
@@ -451,6 +485,9 @@ def main():
         variants_call(args['bam'], args['out_dir'], args['caller'], args['bed'], args['prefix'], args['thread'],
                       args['tmp_dir'], args['keep_tmp'], args['config'], args['script_path'],
                       args['novcfqc'], args['noflt'])
+    elif args['fun'] == 'anno':
+        anno_variants(args['vcf'], args['prefix'], args['out_dir'],
+                      args['script_path'], args['config'], args['thread'], args['mode'])
 
 
 if __name__ == '__main__':

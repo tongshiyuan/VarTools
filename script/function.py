@@ -7,6 +7,7 @@ from script.mapping import bam_deal
 from script.calling import gatk_pre, gatk, gatk_hard_filter, vardict, deep_variant_single, bcftools, strelka
 from script.common import check_software, affinity, execute_system, gender_determined
 from script.case_control import get_matrix, burden
+from script.annotation import anno_all_short_variants, short_variants_filter
 
 
 def read_config(script_path, config_file):
@@ -28,11 +29,19 @@ def read_config(script_path, config_file):
     conf_dict['mapping'] = config.get('parameter', 'mapping')
     conf_dict['platform'] = config.get('map', 'platform')
     conf_dict['caller'] = config.get('call', 'short_var')
-    conf_dict['af_db'] = config.get('anno', 'af_db')
-    conf_dict['gene_db'] = config.get('anno', 'gene_db')
+    # anno
     conf_dict['anno_dir'] = config.get('anno', 'anno_dir')
     conf_dict['ref_version'] = config.get('anno', 'ref_version')
+    conf_dict['gene_db'] = config.get('anno', 'gene_db')
+    conf_dict['region_db'] = config.get('anno', 'region_db')
+    conf_dict['af_db'] = config.get('anno', 'af_db')
+    conf_dict['filter_db'] = config.get('anno', 'filter_db')
+    conf_dict['dd_db'] = config.get('anno', 'dd_db')
+    conf_dict['splice_distance'] = config.get('anno', 'splice_distance')
+    # filter
+    conf_dict['AF_list'] = eval(config.get('filter', 'af_list'))
     conf_dict['AFTh'] = eval(config.get('filter', 'af_threshold'))
+    conf_dict['retain_list'] = eval(config.get('filter', 'retain_list'))
     # case-control
     conf_dict['cc_AF'] = config.get('cc_filter', 'AF_list')
     conf_dict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
@@ -298,3 +307,33 @@ def variants_call(bam, out_dir, caller, bed, prefix, thread, tmp_dir, keep_tmp, 
                             noqc, flt)
     else:
         sys.exit('[Error: Can not identify caller <%s>. ]' % caller)
+
+
+def anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, mode):
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+    out_dir = os.path.abspath(out_dir)
+    config = read_config(script_path, config_file)
+    if mode == 'FA':
+        short_variants_filter(
+            vcf,
+            prefix,
+            out_dir,
+            config['gene_db'],
+            config['region_db'],
+            config['af_db'],
+            config['filter_db'],
+            config['dd_db'],
+            config['splice_distance'],
+            config['AF_list'],
+            config['AFTh'],
+            config['retain_line'],
+            config['anno_dir'],
+            config['ref_version'],
+            script_path,
+            thread)
+    elif mode == 'TA':
+        anno_all_short_variants(
+            vcf, prefix, out_dir,
+            config['gene_db'], config['region_db'], config['af_db'], config['filter_db'], config['dd_db'],
+            config['splice_distance'], config['anno_dir'], config['ref_version'], script_path, thread)

@@ -127,8 +127,18 @@ def short_variants_filter(vcf, prefix, out_dir, gene_db, region_db, af_db, filte
     exonic_file = out_dir + '%s/%s_exonic.txt' % (out_dir, prefix)
     exonic_filter(gene_anno, exonic_file, gene_db, retain_line)
     # annotation
-    all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=gene_db, filter_db=filter_db)
+    all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=af_db, filter_db=filter_db)
     anno_file = anno_db(exonic_file, out_dir, prefix, '.complete_anno.txt', num, all_db, all_ty, anno_dir, ref_version,
+                        script_path, thread, splice_distance=splice_distance, cn=False)
+    return anno_file
+
+
+def anno_all_short_variants(vcf, prefix, out_dir,
+                            gene_db, region_db, af_db, filter_db, dd_db,
+                            splice_distance, anno_dir, ref_version, script_path, thread):
+    avinput, info = short_variants_convert_format(vcf, prefix, out_dir, script_path)
+    all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=af_db, filter_db=filter_db)
+    anno_file = anno_db(avinput, out_dir, prefix, '.complete_anno.txt', 9, all_db, all_ty, anno_dir, ref_version,
                         script_path, thread, splice_distance=splice_distance, cn=False)
     return anno_file
 
