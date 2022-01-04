@@ -101,6 +101,8 @@ def tGT_args(args):
             siblings = args.sibling
             argsd['s_gvcfs'] = [os.path.realpath(_.strip(' ')) for _ in siblings.split(',')]
             print('[ Msg: find %d sibling. ]' % len(argsd['s_gvcfs']))
+        else:
+            argsd['s_gvcfs'] = ''
     argsd['out_dir'] = args.out_dir
     argsd['bed'] = args.bed
     check_bed(argsd['bed'])
