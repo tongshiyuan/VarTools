@@ -39,9 +39,9 @@ def read_config(script_path, config_file):
     conf_dict['dd_db'] = config.get('anno', 'dd_db')
     conf_dict['splice_distance'] = int(config.get('anno', 'splice_distance'))
     # filter
-    conf_dict['AF_list'] = eval(config.get('filter', 'af_list'))
+    conf_dict['AF_list'] = config.get('filter', 'af_list')
     conf_dict['AFTh'] = eval(config.get('filter', 'af_threshold'))
-    conf_dict['retain_list'] = eval(config.get('filter', 'retain_list'))
+    conf_dict['retain_list'] = config.get('filter', 'retain_list')
     # case-control
     conf_dict['cc_AF'] = config.get('cc_filter', 'AF_list')
     conf_dict['cc_AF_AD'] = config.get('cc_filter', 'AF_th_AD')
@@ -327,7 +327,7 @@ def anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, mode):
             config['splice_distance'],
             config['AF_list'],
             config['AFTh'],
-            config['retain_line'],
+            config['retain_list'],
             config['anno_dir'],
             config['ref_version'],
             script_path,

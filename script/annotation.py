@@ -119,6 +119,7 @@ def short_variants_filter(vcf, prefix, out_dir, gene_db, region_db, af_db, filte
     af_anno, num = anno_frequency(avinput, info, out_dir, prefix, db_for_af, ty_for_af, anno_dir, ref_version,
                                   script_path, thread)
     af_filted = out_dir + '/AF_filted.txt'
+    af_list = af_list.strip(',').split(',')
     frequency_filter(af_anno, af_filted, af_list, af_th, retain_line)
     # exonic filter
     db_for_gene, ty_for_gene = db_format(gene_db=gene_db, dd_db=dd_db)
