@@ -22,7 +22,7 @@ def short_variants_convert_format(vcf, prefix, out_dir, script_path):
         with gzip.open(vcf, 'rb') as f:
             for i in f:
                 if i.decode().startswith('#CHROM'):
-                    head.write(i.split('\tALT\t')[1])
+                    head.write(i.decode().split('\tALT\t')[1])
                     break
     else:
         with open(vcf) as f:
@@ -64,7 +64,7 @@ def anno_db(infile, out_dir, prefix, postfix, num, db_list, type_list, anno_dir,
     get_info = 'cut -f %d- %s > %s' % (num, infile, info_file)
     execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
     # anno
-    anno_cmd = 'perl %s/bin/table_annovar.pl %s %s --buildver %s -out %s -remove -protocol %s -operation %s ' \
+    anno_cmd = 'perl %s/bin/annovar/table_annovar.pl %s %s --buildver %s -out %s -remove -protocol %s -operation %s ' \
                '-nastring . --thread %d --intronhgvs %d > /dev/null 2>&1' % (
                    script_path, infile, anno_dir, ver, file_out, db_list, type_list, thread, splice_distance)
     execute_system(anno_cmd, '[ Msg: Gene annotation done ! ]', '[ Error: Something wrong with Gene annotation ! ]')
@@ -107,7 +107,7 @@ def db_format(gene_db='', region_db='', af_db='', filter_db='', dd_db=''):
             db_list.append(i)
             ty_list.append('f')
 
-    return db_list, ty_list
+    return ','.join(db_list), ','.join(ty_list)
 
 
 def short_variants_filter(vcf, prefix, out_dir, gene_db, region_db, af_db, filter_db, dd_db, splice_distance, af_list,

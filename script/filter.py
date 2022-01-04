@@ -4,7 +4,7 @@ from script.common import execute_system
 
 
 def frequency_filter(infile, out_file, fredb_list, threshold, retain_line):
-    print('[ Msg: Start frequency filter, threshold: < %d > .]' % threshold)
+    print(f'[ Msg: Start frequency filter, threshold: < {threshold} > .]')
     freq_index = []
     out_ = open(out_file, 'w')
     with open(infile) as f:
