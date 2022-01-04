@@ -65,7 +65,7 @@ def anno_db(infile, out_dir, prefix, postfix, num, db_list, type_list, anno_dir,
     execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
     # anno
     anno_cmd = 'perl %s/bin/table_annovar.pl %s %s --buildver %s -out %s -remove -protocol %s -operation %s ' \
-               '-nastring . --thread %d --intronhgvs %d> /dev/null 2>&1' % (
+               '-nastring . --thread %d --intronhgvs %d > /dev/null 2>&1' % (
                    script_path, infile, anno_dir, ver, file_out, db_list, type_list, thread, splice_distance)
     execute_system(anno_cmd, '[ Msg: Gene annotation done ! ]', '[ Error: Something wrong with Gene annotation ! ]')
     # 合并

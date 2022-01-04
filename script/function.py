@@ -37,7 +37,7 @@ def read_config(script_path, config_file):
     conf_dict['af_db'] = config.get('anno', 'af_db')
     conf_dict['filter_db'] = config.get('anno', 'filter_db')
     conf_dict['dd_db'] = config.get('anno', 'dd_db')
-    conf_dict['splice_distance'] = config.get('anno', 'splice_distance')
+    conf_dict['splice_distance'] = int(config.get('anno', 'splice_distance'))
     # filter
     conf_dict['AF_list'] = eval(config.get('filter', 'af_list'))
     conf_dict['AFTh'] = eval(config.get('filter', 'af_threshold'))

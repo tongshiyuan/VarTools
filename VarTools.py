@@ -419,6 +419,7 @@ function of VarTools:
     elif sys.argv[1] == 'anno':
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s anno [options] -i VCF')
         parser.description = function['anno']
+        parser.add_argument('ano')
         parser.add_argument('-i', '--invcf', required=True, help='input vcf file.')
         parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
         parser.add_argument('-p', '--prefix', default=False,
