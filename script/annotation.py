@@ -118,14 +118,14 @@ def short_variants_filter(vcf, prefix, out_dir, gene_db, region_db, af_db, filte
     db_for_af, ty_for_af = db_format(af_db=af_db, dd_db=dd_db)
     af_anno, num = anno_frequency(avinput, info, out_dir, prefix, db_for_af, ty_for_af, anno_dir, ref_version,
                                   script_path, thread)
-    af_filted = out_dir + '/AF_filted.txt'
+    af_filted = f'{out_dir}/{prefix}_AF_filted.txt'
     af_list = af_list.strip(',').split(',')
     frequency_filter(af_anno, af_filted, af_list, af_th, retain_line)
     # exonic filter
     db_for_gene, ty_for_gene = db_format(gene_db=gene_db, dd_db=dd_db)
     gene_anno, num = anno_db(af_filted, out_dir, prefix, '.gene_anno.txt', num, db_for_gene, ty_for_gene, anno_dir,
                              ref_version, script_path, thread, splice_distance=splice_distance)
-    exonic_file = out_dir + '%s/%s_exonic.txt' % (out_dir, prefix)
+    exonic_file = '%s/%s_exonic.txt' % (out_dir, prefix)
     exonic_filter(gene_anno, exonic_file, gene_db, retain_line)
     # annotation
     all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=af_db, filter_db=filter_db)
