@@ -144,6 +144,7 @@ def anno_all_short_variants(vcf, prefix, out_dir,
     anno_file = anno_db(avinput, out_dir, prefix, '.complete_anno.txt', 9, all_db, all_ty, anno_dir, ref_version,
                         script_path, thread, splice_distance=splice_distance, cn=False)
     af_filted = f'{out_dir}/{prefix}_AF_filted.txt'
+    af_list = af_list.strip(',').split(',')
     frequency_filter(anno_file, af_filted, af_list, af_th, retain_line)
     exonic_file = f'{out_dir}/{prefix}_exonic.txt'
     exonic_filter(af_filted, exonic_file, gene_db, retain_line)
