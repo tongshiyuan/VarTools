@@ -336,4 +336,7 @@ def anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, mode):
         anno_all_short_variants(
             vcf, prefix, out_dir,
             config['gene_db'], config['region_db'], config['af_db'], config['filter_db'], config['dd_db'],
-            config['splice_distance'], config['anno_dir'], config['ref_version'], script_path, thread)
+            config['splice_distance'], config['anno_dir'], config['ref_version'], script_path, thread,
+            config['AF_list'],
+            config['AFTh'],
+            config['retain_list'])
