@@ -4,7 +4,7 @@ from script.common import execute_system
 
 
 def frequency_filter(infile, out_file, fredb_list, threshold_list, retain_line):
-    th_list = threshold_list.strip(',').split(',')
+    th_list = [eval(i) for i in threshold_list.strip(',').split(',')]
     fredb_list = fredb_list.strip(',').split(',')
     if len(th_list) == 1:
         th_list = th_list * len(fredb_list)
