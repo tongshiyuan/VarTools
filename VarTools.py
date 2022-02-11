@@ -240,9 +240,9 @@ def ta_args(args):
         argsd['prefix'] = os.path.basename(argsd['vcf']).split('.vcf')[0]
     argsd['config'] = args.config
     argsd['mode'] = args.mode
-    args['pn'] = args.sampleName
-    args['fn'] = args.fatherName
-    args['mn'] = args.motherName
+    argsd['pn'] = args.sample_name
+    argsd['fn'] = args.father_name
+    argsd['mn'] = args.mother_name
     return argsd
 
 
@@ -465,11 +465,11 @@ function of VarTools:
         parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
         parser.add_argument('-m', '--mode', default='FA', choices=['FA', 'TA'],
                             help='two mode TA/FA, TA: annotate all info, FA: filter with annotation,[FA].')
-        parser.add_argument('--sampleName', default='',
+        parser.add_argument('--sample_name', default='',
                             help='sample name of proband in file, if not, chose the first sample.')
-        parser.add_argument('--fatherName', default='',
+        parser.add_argument('--father_name', default='',
                             help='sample name of father in file, if not, chose the name have F/Fa/Father/f/fa/father.')
-        parser.add_argument('--motherName', default='',
+        parser.add_argument('--mother_name', default='',
                             help='sample name of mother in file, if not, chose the name have M/Mo/Mather/m/mo/mother.')
         args = parser.parse_args()
         args_dict = ta_args(args)
