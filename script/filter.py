@@ -3,16 +3,28 @@ import pandas as pd
 from script.common import execute_system
 
 
-def frequency_filter(infile, out_file, fredb_list, threshold, retain_line):
-    print(f'[ Msg: Start frequency filter, threshold: < {threshold} > .]')
+def frequency_filter(infile, out_file, fredb_list, threshold_list, retain_line):
+    th_list = threshold_list.strip(',').split(',')
+    fredb_list = fredb_list.strip(',').split(',')
+    if len(th_list) == 1:
+        th_list = th_list * len(fredb_list)
+        print(f'[ Msg: Start frequency filter, threshold: < {th_list[0]} > .]')
+    else:
+        if len(fredb_list) != len(th_list):
+            return
+        else:
+            print('[ Msg: Start frequency filter, with muliple threshold.]')
     freq_index = []
     out_ = open(out_file, 'w')
     with open(infile) as f:
         line = f.readline()
         out_.write(line)
+        col_list = line.strip().split('\t')
         for _db in fredb_list:
             try:
-                freq_index.append(line.strip().split('\t').index(_db))
+                _idx = col_list.index(_db)
+                freq_index.append(_idx)
+                col_list[_idx] = _db + '_indexed_Oxo_'
             except:
                 print('[ Warn: Can not find database <%s> in frequency filter ! ]' % _db)
         if not freq_index:
@@ -38,13 +50,13 @@ def frequency_filter(infile, out_file, fredb_list, threshold, retain_line):
                         out_.write(line)
                         break
                 else:
-                    for af_index in freq_index:
+                    for af_index, threshold in zip(freq_index, th_list):
                         if records[af_index] != '.' and eval(records[af_index]) >= threshold:
                             break
                     else:
                         out_.write(line)
             else:
-                for af_index in freq_index:
+                for af_index, threshold in zip(freq_index, th_list):
                     if records[af_index] != '.' and eval(records[af_index]) >= threshold:
                         break
                 else:
@@ -93,6 +105,58 @@ def exonic_filter(infile, out_file, gene_db, retain_line):
                             break
     out_.close()
     print('[ Msg: Exonic filter done !]')
+
+
+def parent_filter(file, outfile, probend_sample_name='', father_sample_name='', mother_sample_name=''):
+    with open(file) as f:
+        for line in f:
+            if line.startswith('##'):
+                pass
+            else:
+                header = line
+                break
+    num_left = len(header.strip().split('\tFORMAT\t')[0].split('\t'))
+    header_list = header.strip().split('\tFORMAT\t')[1].split('\t')
+    if not (father_sample_name and mother_sample_name):
+        for i, j in enumerate(header_list):
+            if 'F' in j or 'Fa' in j or 'Father' in j or 'f' in j or 'fa' in j or 'father' in j:
+                fa_idx = i + num_left + 1
+                break
+        for i, j in enumerate(header_list):
+            if 'M' in j or 'Mo' in j or 'Mother' in j or 'm' in j or 'mo' in j or 'mother' in j:
+                mo_idx = i + num_left + 1
+                break
+    else:
+        fa_idx = num_left + header_list.index(father_sample_name) + 1
+        mo_idx = num_left + header_list.index(mother_sample_name) + 1
+    if probend_sample_name:
+        p_idx = num_left + header_list.index(probend_sample_name) + 1
+    else:
+        p_idx = num_left + 1
+    of = open(outfile, 'w')
+    with open(file) as f:
+        head = f.readline()
+        while head.startswith('##'):
+            head = f.readline()
+        for line in f:
+            rec = line.strip().split('\t')
+            pinfo = rec[p_idx]
+            fainfo = rec[fa_idx]
+            moinfo = rec[mo_idx]
+            # 过滤条件
+            l1 = pinfo.split(':')[0] in ['0/0', '0|0']
+            l2 = fainfo.split(':')[0] in ['1/1', '1|1']
+            l3 = moinfo.split(':')[0] in ['1/1', '1|1']
+            if l1 or l2 or l3:
+                pass
+            else:
+                of.write(line)
+    of.close()
+    print('[ Msg: Homozygote filtered done! ]')
+
+
+def inheritance_pattern_filter():
+    pass
 
 
 def synonymous_filter(infile, out_file, db_list, clindb_dict, con_dict):

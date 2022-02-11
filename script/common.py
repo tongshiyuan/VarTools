@@ -3,6 +3,14 @@ import sys
 import platform
 import re
 import gzip
+import time
+
+
+def log(level, text):
+    localtime = time.asctime(time.localtime(time.time()))
+    if level == 'ERROR':
+        sys.exit('[{0}]: {1} - {2}'.format(level, localtime, text))
+    print('[{0}]: {1} - {2}'.format(level, localtime, text))
 
 
 def execute_system(cmd, done_notice='', fail_notice=''):
@@ -126,7 +134,7 @@ def get_raw_info(fq1):
 
 
 def get_row_num(tmp_result, header, sep='\t'):
-    num_cmd = 'head -n 1 %s > %s ' % (tmp_result, header)
+    num_cmd = f'head -n 1 {tmp_result} > {header}'
     os.system(num_cmd)
     with open(header) as f:
         num = len(f.readline().rstrip('\n').split(sep))
