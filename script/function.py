@@ -5,10 +5,10 @@ from script.fastq_qc import fastp_qc
 from script.bam_qc import bam_stats
 from script.mapping import bam_deal
 from script.calling import gatk_pre, gatk, gatk_hard_filter, vardict, deep_variant_single, bcftools, strelka
-from script.common import check_software, affinity, execute_system, gender_determined
+from script.common import check_software, affinity, execute_system, gender_determined, log
 from script.case_control import get_matrix, burden
 from script.annotation import anno_all_short_variants, short_variants_filter
-
+from script.filter import parent_filter
 
 def read_config(script_path, config_file):
     if config_file:
@@ -315,7 +315,7 @@ def anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, mode):
     out_dir = os.path.abspath(out_dir)
     config = read_config(script_path, config_file)
     if mode == 'FA':
-        short_variants_filter(
+        anno_file = short_variants_filter(
             vcf,
             prefix,
             out_dir,
@@ -333,10 +333,25 @@ def anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, mode):
             script_path,
             thread)
     elif mode == 'TA':
-        anno_all_short_variants(
+        anno_file = anno_all_short_variants(
             vcf, prefix, out_dir,
             config['gene_db'], config['region_db'], config['af_db'], config['filter_db'], config['dd_db'],
             config['splice_distance'], config['anno_dir'], config['ref_version'], script_path, thread,
             config['AF_list'],
             config['AFTh'],
             config['retain_list'])
+    else:
+        log('ERROR', f'[ Can not identify <{mode}> mode.]')
+        return
+    return anno_file
+
+
+def single_filter():
+    pass
+
+
+def trio_filter(vcf, prefix, out_dir, script_path, config_file, thread, anno_mode='FA', pn='', fn='', mn=''):
+    anno_file = anno_variants(vcf, prefix, out_dir, script_path, config_file, thread, anno_mode)
+    out_dir = os.path.abspath(out_dir)
+    pf_file = f'{out_dir}/{prefix}_homofilter.txt'
+    parent_filter(anno_file, pf_file, pn, fn, mn)

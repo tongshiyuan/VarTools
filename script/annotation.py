@@ -148,6 +148,7 @@ def anno_all_short_variants(vcf, prefix, out_dir,
     frequency_filter(anno_file, af_filted, af_list, af_th, retain_line)
     exonic_file = f'{out_dir}/{prefix}_exonic.txt'
     exonic_filter(af_filted, exonic_file, gene_db, retain_line)
+    return exonic_file
 
 
 def single_short_variants_ranking(vcf):

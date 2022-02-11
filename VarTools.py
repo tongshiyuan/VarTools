@@ -18,7 +18,7 @@ import os
 import sys
 import time
 import argparse
-from script.function import f2v, trio_gt, single_gt, burden_test, bamQC, gender_identify, variants_call, anno_variants
+from script.function import *
 from script.case_control import build_snvdb
 
 
@@ -225,6 +225,27 @@ def anno_args(args):
     return argsd
 
 
+def ta_args(args):
+    argsd = {}
+    if not args.invcf:
+        sys.exit('[ Error: Args incomplete ! ]')
+    else:
+        argsd['vcf'] = os.path.realpath(args.invcf)
+    argsd['out_dir'] = args.out_dir
+    argsd['thread'] = args.thread
+    argsd['keep_tmp'] = args.keep_tmp
+    if args.prefix:
+        argsd['prefix'] = args.prefix
+    else:
+        argsd['prefix'] = os.path.basename(argsd['vcf']).split('.vcf')[0]
+    argsd['config'] = args.config
+    argsd['mode'] = args.mode
+    args['pn'] = args.sampleName
+    args['fn'] = args.fatherName
+    args['mn'] = args.motherName
+    return argsd
+
+
 def ana_args():
     description = '=' * 77 + '\nVarTools 0.1.0 20211011\nWorkflow of WGS/WES analysis.\n' + '=' * 77
     print(description)
@@ -239,13 +260,11 @@ function of VarTools:
     (6) bqc: bam quality check.
     (7) gd: gender identify.
     (8) call: call variants from bam.
-    ----------
     (9) tSV: call trio SV with clinSV (only for WGS).
     (10) sSV: call single SV with clinSV (only for WGS).
     (11) tA: trio analysis.
     (12) sA: single case analysis.
     (13) bt: Burden testing with TRAPD.
-    -----------
     (14) anno: annotation for small variants.
     To get help on a particular command, call it with -h/--help.
     '''
@@ -421,7 +440,7 @@ function of VarTools:
     elif sys.argv[1] == 'anno':
         parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s anno [options] -i VCF')
         parser.description = function['anno']
-        parser.add_argument('ano')
+        parser.add_argument('anno')
         parser.add_argument('-i', '--invcf', required=True, help='input vcf file.')
         parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
         parser.add_argument('-p', '--prefix', default=False,
@@ -433,6 +452,27 @@ function of VarTools:
                             help='two mode TA/FA, TA: annotate all info, FA: filter with annotation,[FA].')
         args = parser.parse_args()
         args_dict = anno_args(args)
+    elif sys.argv[1] == 'tA':
+        parser = argparse.ArgumentParser(prog='VarTool.py', usage='%(prog)s tA [options] -i VCF')
+        parser.description = function['tA']
+        parser.add_argument('tA')
+        parser.add_argument('-i', '--invcf', required=True, help='input vcf file.')
+        parser.add_argument('-o', '--out_dir', default='./', help='output directory of result, [./].')
+        parser.add_argument('-p', '--prefix', default=False,
+                            help='prefix of output file, if not, will use input vcf name.')
+        parser.add_argument('--keep_tmp', action='store_true', help='keep temp directory.')
+        parser.add_argument('--config', default=False, help='you can change config in \'lib\' or set by your need.')
+        parser.add_argument('-t', '--thread', default=1, type=int, help='thread of component softwares, [1].')
+        parser.add_argument('-m', '--mode', default='FA', choices=['FA', 'TA'],
+                            help='two mode TA/FA, TA: annotate all info, FA: filter with annotation,[FA].')
+        parser.add_argument('--sampleName', default='',
+                            help='sample name of proband in file, if not, chose the first sample.')
+        parser.add_argument('--fatherName', default='',
+                            help='sample name of father in file, if not, chose the name have F/Fa/Father/f/fa/father.')
+        parser.add_argument('--motherName', default='',
+                            help='sample name of mother in file, if not, chose the name have M/Mo/Mather/m/mo/mother.')
+        args = parser.parse_args()
+        args_dict = ta_args(args)
     else:
         sys.exit('[ Error: Can not identify the function of <%s>]' % sys.argv[1])
 
@@ -481,9 +521,11 @@ def main():
     elif args['fun'] == 'gd':
         gender_identify(args['bam'], args['bed'], args['tmp_dir'], args['thread'], args['script_path'], args['rate'])
     elif args['fun'] == 'tA':
-        pass
+        trio_filter(args['vcf'], args['prefix'], args['out_dir'],
+                    args['script_path'], args['config'], args['thread'], args['mode'], args['pn'], args['fn'],
+                    args['mn'])
     elif args['fun'] == 'sA':
-        pass
+        single_filter()
     elif args['fun'] == 'call':
         variants_call(args['bam'], args['out_dir'], args['caller'], args['bed'], args['prefix'], args['thread'],
                       args['tmp_dir'], args['keep_tmp'], args['config'], args['script_path'],
