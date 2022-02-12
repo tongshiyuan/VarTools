@@ -56,14 +56,17 @@ def anno_frequency(avinput, info, out_dir, prefix, db_list, type_list, anno_dir,
     return result, num + 1
 
 
-def anno_db(infile, out_dir, prefix, postfix, num, db_list, type_list, anno_dir, ver, script_path, thread,
-            splice_distance, cn=True):
+def anno_db(infile, info_file, out_dir, prefix, postfix, db_list, type_list, anno_dir, ver, script_path, thread,
+            splice_distance, cn=True, first=True):
     file_out = out_dir + '/' + prefix
     # get genotyping
-    info_file = out_dir + '/' + prefix + '.info'
-    get_info = 'cut -f %d- %s > %s' % (num, infile, info_file)
-    execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
+    # info_file = out_dir + '/' + prefix + '.info'
+    # get_info = 'cut -f %d- %s > %s' % (num, infile, info_file)
+    # execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
     # anno
+    if first:
+        cut_cmd = f"sed -i '1d' {infile}"
+        execute_system(cut_cmd)
     anno_cmd = 'perl %s/bin/annovar/table_annovar.pl %s %s --buildver %s -out %s -remove -protocol %s -operation %s ' \
                '-nastring . --thread %d --intronhgvs %d > /dev/null 2>&1' % (
                    script_path, infile, anno_dir, ver, file_out, db_list, type_list, thread, splice_distance)
@@ -123,14 +126,20 @@ def short_variants_filter(vcf, prefix, out_dir, gene_db, region_db, af_db, filte
     frequency_filter(af_anno, af_filted, af_list, af_th_list, retain_line)
     # exonic filter
     db_for_gene, ty_for_gene = db_format(gene_db=gene_db, dd_db=dd_db)
-    gene_anno, num = anno_db(af_filted, out_dir, prefix, '.gene_anno.txt', num, db_for_gene, ty_for_gene, anno_dir,
+    af_info = f'{out_dir}/{prefix}_AF_info.txt'
+    get_info = 'cut -f %d- %s > %s' % (num, af_filted, af_info)
+    execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
+    gene_anno, num = anno_db(af_filted, af_info, out_dir, prefix, '.gene_anno.txt', db_for_gene, ty_for_gene, anno_dir,
                              ref_version, script_path, thread, splice_distance=splice_distance)
     exonic_file = '%s/%s_exonic.txt' % (out_dir, prefix)
     exonic_filter(gene_anno, exonic_file, gene_db, retain_line)
     # annotation
     all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=af_db, filter_db=filter_db)
-    anno_file = anno_db(exonic_file, out_dir, prefix, '.complete_anno.txt', num, all_db, all_ty, anno_dir, ref_version,
-                        script_path, thread, splice_distance=splice_distance, cn=False)
+    ex_info = f'{out_dir}/{prefix}_exonic_info.txt'
+    get_info = 'cut -f %d- %s > %s' % (num, exonic_file, ex_info)
+    execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
+    anno_file = anno_db(exonic_file, ex_info, out_dir, prefix, '.complete_anno.txt', all_db, all_ty, anno_dir,
+                        ref_version, script_path, thread, splice_distance=splice_distance, cn=False)
     return anno_file
 
 
@@ -141,8 +150,11 @@ def anno_all_short_variants(vcf, prefix, out_dir,
                             ):
     avinput, info = short_variants_convert_format(vcf, prefix, out_dir, script_path)
     all_db, all_ty = db_format(gene_db=gene_db, region_db=region_db, dd_db=dd_db, af_db=af_db, filter_db=filter_db)
-    anno_file = anno_db(avinput, out_dir, prefix, '.complete_anno.txt', 9, all_db, all_ty, anno_dir, ref_version,
-                        script_path, thread, splice_distance=splice_distance, cn=False)
+    _info = f'{out_dir}/{prefix}_info.txt'
+    get_info = 'cut -f %d- %s > %s' % (9, avinput, _info)
+    execute_system(get_info, '[ Msg: Get genotype done ! ]', '[ Error: Something wrong with get genotype ! ]')
+    anno_file = anno_db(avinput, _info, out_dir, prefix, '.complete_anno.txt', all_db, all_ty, anno_dir, ref_version,
+                        script_path, thread, splice_distance=splice_distance, cn=False, first=False)
     af_filted = f'{out_dir}/{prefix}_AF_filted.txt'
     af_list = af_list.strip(',').split(',')
     frequency_filter(anno_file, af_filted, af_list, af_th, retain_line)
