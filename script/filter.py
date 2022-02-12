@@ -136,8 +136,10 @@ def parent_filter(file, outfile, probend_sample_name='', father_sample_name='', 
     of = open(outfile, 'w')
     with open(file) as f:
         head = f.readline()
+        of.write(head)
         while head.startswith('##'):
             head = f.readline()
+            of.write(head)
         for line in f:
             rec = line.strip().split('\t')
             pinfo = rec[p_idx]
